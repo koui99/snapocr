@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.python-version
+
+# PyInstaller (M5 打包产物)
+build/
+dist/
+*.manifest
+
+# OCR 模型(体积大,单独下载/打包)
+models/*.onnx
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志与运行时
+*.log
+logs/

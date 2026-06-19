@@ -1,0 +1,131 @@
+/* SnapOCR 全局样式表(模板)
+ * 形如 @primary、@radius_lg 的占位符,由 theme_manager 在加载时按 design token 替换。
+ * 占位符替换按长度降序进行,避免 @primary 误伤 @primary_hover。
+ */
+
+* {
+    font-family: @font_family;
+    font-size: @font_size_base;
+    color: @text_main;
+}
+
+/* ---- 设置窗内容容器(无边框 + 大圆角) ---- */
+#settingsContent {
+    background-color: @bg_card;
+    border: 1px solid @border;
+    border-radius: @radius_lg;
+}
+
+/* ---- 标题栏 ---- */
+#titleBar {
+    background-color: @bg_card;
+    border-top-left-radius: @radius_lg;
+    border-top-right-radius: @radius_lg;
+}
+#titleBarText {
+    font-weight: bold;
+    color: @text_main;
+}
+#winCloseBtn {
+    border: none;
+    background: transparent;
+    border-radius: @radius_sm;
+    color: @text_secondary;
+}
+#winCloseBtn:hover {
+    background-color: @danger;
+    color: #FFFFFF;
+}
+
+/* ---- 左侧导航 ---- */
+#settingsNav {
+    background-color: @bg_main;
+    border: none;
+    border-right: 1px solid @border;
+    outline: 0;
+    padding-top: 8px;
+}
+#settingsNav::item {
+    padding: 8px 16px;
+    color: @text_secondary;
+    border: none;
+}
+#settingsNav::item:hover {
+    background-color: @primary_active_bg;
+}
+#settingsNav::item:selected {
+    background-color: @primary_active_bg;
+    color: @primary;
+    border-right: 2px solid @primary;
+    font-weight: bold;
+}
+
+/* ---- 右侧内容区 ---- */
+#settingsStack {
+    background-color: @bg_card;
+}
+
+/* ---- 设置窗底部操作栏 ---- */
+#settingsFooter {
+    background-color: @bg_main;
+    border-top: 1px solid @border;
+    border-bottom-left-radius: @radius_lg;
+    border-bottom-right-radius: @radius_lg;
+}
+QLabel[pageTitle="true"] {
+    font-size: 16px;
+    font-weight: bold;
+    color: @text_main;
+}
+QLabel[hint="true"] {
+    color: @text_muted;
+}
+
+/* ---- 按钮 ---- */
+QPushButton {
+    padding: 5px 14px;
+    border: 1px solid @border;
+    border-radius: @radius_sm;
+    background-color: @bg_card;
+    color: @text_main;
+}
+QPushButton:hover {
+    background-color: @bg_main;
+}
+QPushButton:pressed {
+    background-color: @primary_active_bg;
+}
+QPushButton[primary="true"] {
+    background-color: @primary;
+    color: #FFFFFF;
+    border-color: @primary;
+}
+QPushButton[primary="true"]:hover {
+    background-color: @primary_hover;
+}
+QPushButton[link="true"] {
+    border: none;
+    background: transparent;
+    color: @primary;
+    padding: 2px 6px;
+}
+
+/* ---- 热键录制框 ---- */
+HotkeyLineEdit {
+    border: 1px solid @border;
+    border-radius: @radius_sm;
+    padding: 4px 8px;
+    background-color: @bg_main;
+    color: @text_main;
+}
+HotkeyLineEdit[recording="true"] {
+    border: 1px solid @primary;
+    background-color: @bg_card;
+    color: @primary;
+}
+
+/* ---- 复选框 ---- */
+QCheckBox {
+    color: @text_main;
+    spacing: 8px;
+}

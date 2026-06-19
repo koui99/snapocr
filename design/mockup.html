@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>截图精灵 / SnapOCR - UI Mockup</title>
+<style>
+  :root {
+    --bg-color: #F5F6F8;
+    --card-bg: #FFFFFF;
+    --primary-color: #2D7FF9;
+    --primary-hover: #1b68dc;
+    --text-main: #333333;
+    --text-secondary: #666666;
+    --text-muted: #999999;
+    --border-color: #E2E4E8;
+    --shadow-soft: 0 4px 16px rgba(0,0,0,0.08);
+    --shadow-heavy: 0 8px 24px rgba(0,0,0,0.15);
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    font-family: var(--font-family);
+    color: var(--text-main);
+  }
+
+  .header {
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(180deg, #fff 0%, transparent 100%);
+    margin-bottom: 20px;
+  }
+
+  .header h1 {
+    margin: 0;
+    font-size: 32px;
+    color: var(--text-main);
+  }
+
+  .header p {
+    margin: 10px 0 0;
+    color: var(--text-secondary);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+  }
+
+  .full-width {
+    grid-column: 1 / -1;
+  }
+
+  .section {
+    margin-bottom: 40px;
+  }
+
+  .section-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+
+  .section-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    background-image: 
+      linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+      linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+      linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+      linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+  
+  /* Mockup 1: Screenshot Area */
+  .screenshot-overlay {
+    position: absolute;
+    top: 20px; left: 20px; right: 20px; bottom: 20px;
+    background: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="%23ddd"/><text x="10" y="50" font-family="sans-serif" font-size="12" fill="%23999">Desktop Background</text></svg>');
+    background-size: cover;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+  }
+  .selection-box {
+    position: absolute;
+    top: 50px; left: 100px; width: 600px; height: 350px;
+    border: 2px solid var(--primary-color);
+    box-sizing: border-box;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+    background: transparent;
+  }
+  .selection-box::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border: 1px dashed rgba(255,255,255,0.5);
+  }
+  .size-info {
+    position: absolute;
+    top: -25px; left: -2px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 2px 6px;
+    font-size: 12px;
+    border-radius: 4px;
+  }
+  .control-point {
+    position: absolute;
+    width: 8px; height: 8px;
+    background: #fff;
+    border: 1px solid var(--primary-color);
+    border-radius: 50%;
+  }
+  .cp-tl { top: -4px; left: -4px; }
+  .cp-tc { top: -4px; left: 50%; transform: translateX(-50%); }
+  .cp-tr { top: -4px; right: -4px; }
+  .cp-cl { top: 50%; left: -4px; transform: translateY(-50%); }
+  .cp-cr { top: 50%; right: -4px; transform: translateY(-50%); }
+  .cp-bl { bottom: -4px; left: -4px; }
+  .cp-bc { bottom: -4px; left: 50%; transform: translateX(-50%); }
+  .cp-br { bottom: -4px; right: -4px; }
+
+  .toolbar-wrapper {
+    position: absolute;
+    bottom: -80px; right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  
+  .toolbar {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-heavy);
+    display: flex;
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .tool-btn {
+    width: 32px; height: 32px;
+    display: flex; justify-content: center; align-items: center;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--text-main);
+    position: relative;
+  }
+  .tool-btn:hover { background: var(--bg-color); }
+  .tool-btn.active { background: #eef4ff; color: var(--primary-color); }
+  .tool-btn.primary { color: var(--primary-color); font-weight: bold; }
+  .tool-btn.success { color: #10b981; }
+  .tool-btn.danger { color: #ef4444; }
+  
+  .tool-divider {
+    width: 1px; background: var(--border-color); margin: 4px;
+  }
+
+  .sub-toolbar {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-heavy);
+    display: flex;
+    padding: 6px 12px;
+    gap: 16px;
+    align-items: center;
+    position: relative;
+  }
+  /* 属性条是“上下文浮层”：选中绘图工具时才弹出，带小尖角指向所属工具 */
+  .sub-toolbar::before {
+    content: "";
+    position: absolute;
+    top: -6px; right: 18px;
+    width: 10px; height: 10px;
+    background: var(--card-bg);
+    transform: rotate(45deg);
+    box-shadow: -2px -2px 4px rgba(0,0,0,0.04);
+  }
+  .palette-note {
+    position: absolute;
+    top: 50%; left: -12px;
+    transform: translate(-100%, -50%);
+    white-space: nowrap;
+    background: rgba(45,127,249,0.12);
+    color: var(--primary-color);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(45,127,249,0.3);
+  }
+
+  /* 右上角对照：未选工具时，属性条收起 */
+  .state-compare {
+    position: absolute;
+    top: 16px; right: 16px;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft);
+    padding: 10px 12px;
+    z-index: 20;
+    width: 230px;
+  }
+  .state-compare .sc-title {
+    font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; font-weight: bold;
+  }
+  .state-compare .toolbar { box-shadow: 0 1px 4px rgba(0,0,0,0.12); margin-bottom: 6px; }
+  .state-compare .tool-btn { width: 24px; height: 24px; font-size: 13px; }
+  .state-compare .sc-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  
+  .stroke-sizes {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .stroke-dot {
+    background: var(--text-main); border-radius: 50%; cursor: pointer;
+  }
+  .stroke-dot.sm { width: 4px; height: 4px; }
+  .stroke-dot.md { width: 8px; height: 8px; background: var(--primary-color); }
+  .stroke-dot.lg { width: 12px; height: 12px; }
+
+  .colors {
+    display: flex; gap: 6px;
+  }
+  .color-dot {
+    width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,0.1);
+  }
+
+  .magnifier {
+    position: absolute;
+    top: 60px; left: 80px;
+    width: 120px; background: rgba(0,0,0,0.8);
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: var(--radius-sm);
+    color: #fff;
+    font-size: 12px;
+    box-shadow: var(--shadow-heavy);
+  }
+  .magnifier-grid {
+    height: 80px;
+    background: 
+      linear-gradient(transparent 90%, rgba(255,255,255,0.2) 90%),
+      linear-gradient(90deg, transparent 90%, rgba(255,255,255,0.2) 90%);
+    background-size: 10px 10px;
+    position: relative;
+    background-color: #3A7BD5;
+  }
+  .magnifier-cross {
+    position: absolute; inset: 0; margin: auto;
+    width: 12px; height: 12px;
+    border: 1px solid #fff;
+  }
+  .magnifier-info {
+    padding: 6px;
+    display: flex; justify-content: space-between;
+  }
+
+  /* Mockup 2: Pin Window & Context Menu */
+  .pin-window {
+    position: relative;
+    width: 250px; height: 180px;
+    background: #fff;
+    box-shadow: var(--shadow-heavy);
+    border: 1px solid rgba(0,0,0,0.1);
+    display: flex; justify-content: center; align-items: center;
+    background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><text x="10" y="50" font-family="sans-serif" font-size="14" fill="%23666">Pasted Image</text></svg>');
+    background-size: cover;
+  }
+  .pin-badge {
+    position: absolute; bottom: 0; right: 0;
+    background: rgba(0,0,0,0.6); color: #fff;
+    font-size: 12px; padding: 2px 6px;
+  }
+
+  .context-menu {
+    position: absolute;
+    top: 50%; left: calc(50% + 80px);
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-heavy);
+    width: 180px;
+    padding: 6px 0;
+    font-size: 13px;
+    z-index: 10;
+  }
+  .menu-item {
+    padding: 8px 16px;
+    display: flex; justify-content: space-between;
+    cursor: pointer;
+  }
+  .menu-item:hover { background: var(--bg-color); }
+  .menu-divider {
+    height: 1px; background: var(--border-color); margin: 4px 0;
+  }
+  .menu-shortcut { color: var(--text-muted); font-size: 12px; }
+
+  /* Mockup 3: OCR Window */
+  .window-frame {
+    width: 500px;
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-heavy);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .window-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .window-title { font-size: 14px; font-weight: bold; }
+  .window-controls { display: flex; gap: 8px; }
+  .win-btn { width: 12px; height: 12px; border-radius: 50%; }
+  .win-min { background: #febb40; }
+  .win-max { background: #34c84a; }
+  .win-close { background: #fc5753; }
+  
+  .ocr-toolbar {
+    padding: 8px 16px; border-bottom: 1px solid var(--border-color);
+    display: flex; gap: 12px; align-items: center; background: #fafafa;
+  }
+  .select-box {
+    border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 12px;
+  }
+  .btn-sm {
+    padding: 4px 12px; border: 1px solid var(--border-color); border-radius: 4px;
+    background: #fff; font-size: 12px; cursor: pointer;
+  }
+  .btn-sm.primary { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+
+  .ocr-content {
+    display: flex; height: 200px;
+  }
+  .ocr-img-pane {
+    flex: 1; border-right: 1px solid var(--border-color); padding: 10px;
+    background: var(--bg-color); display: flex; justify-content: center; align-items: center;
+  }
+  .ocr-thumb {
+    width: 80%; height: 80%; border: 1px dashed var(--primary-color);
+    background: #fff; display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 12px; position: relative;
+  }
+  .ocr-thumb::after {
+    content: ""; position: absolute; top: 10px; left: 10px; width: 60%; height: 20px;
+    background: rgba(45,127,249,0.2);
+  }
+  .ocr-text-pane {
+    flex: 1.5; padding: 10px; font-size: 13px; line-height: 1.6; color: var(--text-main);
+    outline: none;
+  }
+
+  .ocr-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px; border-top: 1px solid var(--border-color);
+    background: #fafafa;
+  }
+  .ocr-status { font-size: 12px; color: var(--text-muted); }
+  .ocr-actions { display: flex; gap: 8px; }
+
+  /* Mockup 4: Settings & Tray */
+  .mockup4-container {
+    display: flex; gap: 30px; width: 100%; justify-content: center; align-items: flex-start;
+  }
+
+  .settings-window {
+    width: 450px; background: var(--card-bg); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-heavy); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .settings-body { display: flex; height: 280px; }
+  .settings-nav {
+    width: 120px; background: var(--bg-color); padding: 10px 0;
+  }
+  .nav-item {
+    padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--text-secondary);
+  }
+  .nav-item.active { background: #eef4ff; color: var(--primary-color); font-weight: bold; border-right: 2px solid var(--primary-color); }
+  .settings-content {
+    flex: 1; padding: 20px;
+  }
+  .hotkey-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px; font-size: 13px;
+  }
+  .hotkey-input {
+    border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px;
+    width: 100px; text-align: center; background: #fafafa; font-family: monospace;
+  }
+  .hotkey-edit { color: var(--primary-color); font-size: 12px; cursor: pointer; }
+
+  .settings-footer {
+    padding: 10px 16px; border-top: 1px solid var(--border-color);
+    display: flex; justify-content: space-between; align-items: center;
+    background: #fafafa;
+  }
+
+  .tray-menu {
+    width: 180px; background: var(--card-bg); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-heavy); padding: 6px 0; font-size: 13px;
+    align-self: flex-end; margin-top: 40px;
+  }
+
+  /* Tokens Area */
+  .tokens-area {
+    background: #fff; padding: 30px; border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+  }
+  .token-group { margin-bottom: 20px; }
+  .token-row { display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap; }
+  .token-box { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .color-swatch { width: 30px; height: 30px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); }
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>截图精灵 / SnapOCR <span style="font-size: 16px; color: var(--text-muted); font-weight: normal;">v1.0.0</span></h1>
+  <p>轻量级桌面截图与标注工具，内置强大本地 OCR</p>
+</div>
+
+<div class="container">
+
+  <!-- 1. 截图选区 + 标注工具栏 -->
+  <div class="section full-width">
+    <div class="section-title">① 截图选区与标注工具栏（核心界面）</div>
+    <div class="section-desc">拖拽选区后，右下角弹出经典两排工具栏，支持丰富标注与 OCR 提取。<b>颜色 / 粗细属性条仅在选中绘图工具时出现，平时自动隐藏</b>（见右上角「未选工具」对照）。</div>
+    <div class="card" style="height: 500px; display: block; padding: 0;">
+      <div class="screenshot-overlay">
+        <div class="mask"></div>
+
+        <!-- 对照：未选绘图工具时，属性条收起 -->
+        <div class="state-compare">
+          <div class="sc-title">未选工具时（默认）</div>
+          <div class="toolbar">
+            <div class="tool-btn" title="矩形">&#9633;</div>
+            <div class="tool-btn" title="椭圆">&#9675;</div>
+            <div class="tool-btn" title="箭头">&#10140;</div>
+            <div class="tool-btn" title="画笔">&#9998;</div>
+            <div class="tool-btn" title="文字">T</div>
+          </div>
+          <div class="sc-hint">没有颜色 / 粗细条，工具栏更简洁</div>
+        </div>
+        
+        <!-- Magnifier -->
+        <div class="magnifier">
+          <div class="magnifier-grid">
+            <div class="magnifier-cross"></div>
+          </div>
+          <div class="magnifier-info">
+            <span>(320, 240)</span>
+            <span>#3A7BD5</span>
+          </div>
+        </div>
+
+        <!-- Selection Box -->
+        <div class="selection-box">
+          <div class="size-info">1280 × 720</div>
+          <div class="control-point cp-tl"></div>
+          <div class="control-point cp-tc"></div>
+          <div class="control-point cp-tr"></div>
+          <div class="control-point cp-cl"></div>
+          <div class="control-point cp-cr"></div>
+          <div class="control-point cp-bl"></div>
+          <div class="control-point cp-bc"></div>
+          <div class="control-point cp-br"></div>
+
+          <!-- Toolbars -->
+          <div class="toolbar-wrapper">
+            <!-- 上排：标注工具 -->
+            <div class="toolbar">
+              <div class="tool-btn" title="矩形">&#9633;</div>
+              <div class="tool-btn" title="椭圆">&#9675;</div>
+              <div class="tool-btn" title="直线">&#8599;</div>
+              <div class="tool-btn" title="箭头">&#10140;</div>
+              <div class="tool-btn" title="画笔">&#9998;</div>
+              <div class="tool-btn" title="马克笔">&#10000;</div>
+              <div class="tool-btn" title="马赛克">&#9638;</div>
+              <div class="tool-btn active" title="文字">T</div>
+              <div class="tool-btn" title="序号标记">&#10102;</div>
+              <div class="tool-btn" title="橡皮擦"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></div>
+            </div>
+            
+            <!-- 二级属性条（上下文浮层：仅选中绘图工具时显示） -->
+            <div class="sub-toolbar">
+              <div class="palette-note">仅选中绘图工具时显示</div>
+              <div class="stroke-sizes">
+                <div class="stroke-dot sm"></div>
+                <div class="stroke-dot md"></div>
+                <div class="stroke-dot lg"></div>
+              </div>
+              <div class="tool-divider"></div>
+              <div class="colors">
+                <div class="color-dot" style="background: #ef4444;"></div>
+                <div class="color-dot" style="background: #f97316;"></div>
+                <div class="color-dot" style="background: #eab308;"></div>
+                <div class="color-dot" style="background: #22c55e;"></div>
+                <div class="color-dot" style="background: #3b82f6;"></div>
+                <div class="color-dot" style="background: #a855f7;"></div>
+                <div class="color-dot" style="background: #000000;"></div>
+                <div class="color-dot" style="background: #ffffff;"></div>
+              </div>
+            </div>
+
+            <!-- 下排：操作栏 -->
+            <div class="toolbar">
+              <div class="tool-btn" title="撤销">&#8617;</div>
+              <div class="tool-btn" title="重做">&#8618;</div>
+              <div class="tool-divider"></div>
+              <div class="tool-btn" title="取色">&#127912;</div>
+              <div class="tool-divider"></div>
+              <div class="tool-btn" title="钉图">&#128204;</div>
+              <div class="tool-btn" title="复制">&#128203;</div>
+              <div class="tool-btn" title="保存">&#128190;</div>
+              <div class="tool-btn primary" title="文字识别(OCR)" style="width: auto; padding: 0 8px; font-size: 14px;">[OCR] 识别</div>
+              <div class="tool-divider"></div>
+              <div class="tool-btn danger" title="取消">&#10005;</div>
+              <div class="tool-btn success" title="确认">&#10003;</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 贴图浮窗 -->
+  <div class="section">
+    <div class="section-title">② 贴图浮窗（Pin）</div>
+    <div class="section-desc">纯净的图片窗口，右键呼出丰富菜单。</div>
+    <div class="card">
+      <div class="pin-window">
+        <div class="pin-badge">100%</div>
+      </div>
+      
+      <div class="context-menu">
+        <div class="menu-item"><span>复制</span><span class="menu-shortcut">Ctrl+C</span></div>
+        <div class="menu-item"><span>保存图片</span><span class="menu-shortcut">Ctrl+S</span></div>
+        <div class="menu-item" style="color: var(--primary-color);"><span>文字识别 (OCR)</span></div>
+        <div class="menu-divider"></div>
+        <div class="menu-item"><span>缩放</span><span>&#9656;</span></div>
+        <div class="menu-item"><span>不透明度</span><span>&#9656;</span></div>
+        <div class="menu-item"><span>旋转</span><span>&#9656;</span></div>
+        <div class="menu-divider"></div>
+        <div class="menu-item"><span>置顶</span></div>
+        <div class="menu-item"><span>取消贴图</span><span class="menu-shortcut">Esc</span></div>
+        <div class="menu-item" style="color: #ef4444;"><span>销毁</span><span class="menu-shortcut">Shift+Esc</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. OCR 文字识别窗 -->
+  <div class="section">
+    <div class="section-title">③ OCR 文字识别窗</div>
+    <div class="section-desc">识别结果展示，支持对照原图编辑，独立窗口。</div>
+    <div class="card">
+      <div class="window-frame">
+        <div class="window-header">
+          <div class="window-title">文字识别结果</div>
+          <div class="window-controls">
+            <div class="win-btn win-min"></div>
+            <div class="win-btn win-max"></div>
+            <div class="win-btn win-close"></div>
+          </div>
+        </div>
+        <div class="ocr-toolbar">
+          <select class="select-box">
+            <option>简体中文 + 英文</option>
+            <option>仅英文</option>
+          </select>
+          <button class="btn-sm">重新识别</button>
+        </div>
+        <div class="ocr-content">
+          <div class="ocr-img-pane">
+            <div class="ocr-thumb">原图缩略区</div>
+          </div>
+          <div class="ocr-text-pane" contenteditable="true">
+            这是一个测试段落。<br>
+            Snipaste clone with OCR feature.<br><br>
+            识别结果可以直接在这里编辑，<br>
+            支持换行和基本排版。
+          </div>
+        </div>
+        <div class="ocr-footer">
+          <div class="ocr-status">识别耗时 0.8s · 置信度 96%</div>
+          <div class="ocr-actions">
+            <button class="btn-sm">翻译</button>
+            <button class="btn-sm">保存 txt</button>
+            <button class="btn-sm primary">复制全部</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 设置窗 + 托盘菜单 -->
+  <div class="section full-width">
+    <div class="section-title">④ 设置窗 + 托盘右键菜单</div>
+    <div class="section-desc">系统设置与托盘入口。</div>
+    <div class="card">
+      <div class="mockup4-container">
+        
+        <!-- 设置窗 -->
+        <div class="settings-window">
+          <div class="window-header">
+            <div class="window-title">设置</div>
+            <div class="window-controls"><div class="win-btn win-close"></div></div>
+          </div>
+          <div class="settings-body">
+            <div class="settings-nav">
+              <div class="nav-item">常规</div>
+              <div class="nav-item active">热键</div>
+              <div class="nav-item">截屏</div>
+              <div class="nav-item">贴图</div>
+              <div class="nav-item">输出</div>
+              <div class="nav-item">文字识别(OCR)</div>
+              <div class="nav-item">关于</div>
+            </div>
+            <div class="settings-content">
+              <div class="hotkey-row">
+                <span>截屏</span>
+                <div><span class="hotkey-input">F1</span> <span class="hotkey-edit">修改</span></div>
+              </div>
+              <div class="hotkey-row">
+                <span>贴图</span>
+                <div><span class="hotkey-input">F3</span> <span class="hotkey-edit">修改</span></div>
+              </div>
+              <div class="hotkey-row">
+                <span>隐藏/显示贴图</span>
+                <div><span class="hotkey-input">Shift + F3</span> <span class="hotkey-edit">修改</span></div>
+              </div>
+              <div class="hotkey-row">
+                <span>文字识别</span>
+                <div><span class="hotkey-input">F4</span> <span class="hotkey-edit">修改</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-footer">
+            <button class="btn-sm">恢复默认</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-sm">取消</button>
+              <button class="btn-sm primary">确定</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 托盘菜单 -->
+        <div class="tray-menu">
+          <div class="menu-item"><span>截屏</span><span class="menu-shortcut">F1</span></div>
+          <div class="menu-item"><span>贴图</span><span class="menu-shortcut">F3</span></div>
+          <div class="menu-item"><span>从剪贴板贴图</span></div>
+          <div class="menu-item"><span>文字识别</span><span class="menu-shortcut">F4</span></div>
+          <div class="menu-item"><span>最近文件</span><span>&#9656;</span></div>
+          <div class="menu-divider"></div>
+          <div class="menu-item"><span>设置</span></div>
+          <div class="menu-item"><span>&#10003; 开机启动</span></div>
+          <div class="menu-divider"></div>
+          <div class="menu-item"><span>帮助</span></div>
+          <div class="menu-item"><span>关于</span></div>
+          <div class="menu-divider"></div>
+          <div class="menu-item"><span>退出</span></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Design Tokens -->
+  <div class="section full-width">
+    <div class="section-title">附：设计规范 (Design Tokens)</div>
+    <div class="tokens-area">
+      <div class="token-group">
+        <strong>Colors</strong>
+        <div class="token-row">
+          <div class="token-box"><div class="color-swatch" style="background: #2D7FF9;"></div> 主色 Primary (#2D7FF9)</div>
+          <div class="token-box"><div class="color-swatch" style="background: #F5F6F8;"></div> 背景 Bg (#F5F6F8)</div>
+          <div class="token-box"><div class="color-swatch" style="background: #333333;"></div> 正文 Text (#333333)</div>
+          <div class="token-box"><div class="color-swatch" style="background: #E2E4E8;"></div> 边框 Border (#E2E4E8)</div>
+        </div>
+      </div>
+      <div class="token-group">
+        <strong>Radius</strong>
+        <div class="token-row">
+          <div class="token-box">小圆角: 6px (工具栏/按钮)</div>
+          <div class="token-box">中圆角: 8px</div>
+          <div class="token-box">大圆角: 12px (窗口/卡片)</div>
+        </div>
+      </div>
+      <div class="token-group">
+        <strong>Shadows</strong>
+        <div class="token-row">
+          <div class="token-box">柔和阴影: 0 4px 16px rgba(0,0,0,0.08)</div>
+          <div class="token-box">重阴影 (浮窗): 0 8px 24px rgba(0,0,0,0.15)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
