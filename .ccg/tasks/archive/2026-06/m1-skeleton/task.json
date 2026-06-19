@@ -1,0 +1,12 @@
+{
+  "id": "m1-skeleton",
+  "title": "M1 项目骨架:PySide6 工程 + 系统托盘常驻 + 全局热键 + 设置窗",
+  "status": "completed",
+  "strategy": "full-collaborate",
+  "currentPhase": "6-final",
+  "nextAction": "已验收完成,M1 交付;真实运行验证待 Windows 实测",
+  "gate": null,
+  "branch": "master",
+  "scope": "m1-skeleton",
+  "createdAt": "2026-06-19T13:11:27Z"
+}
