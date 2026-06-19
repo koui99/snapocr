@@ -46,8 +46,17 @@ class TrayIcon(QObject):
         return QSystemTrayIcon.isSystemTrayAvailable()
 
     def show_message(self, title: str, text: str) -> None:
-        if self._tray.supportsMessages():
-            self._tray.showMessage(title, text, make_app_icon(), 3000)
+        # 不用 supportsMessages() 拦截(部分环境会误报 False);直接弹,用标准信息图标。
+        # 打一条日志便于排查:若日志出现此行但屏幕无气泡,基本可判定是 Windows
+        # 通知设置(专注助手 / 已关闭通知)拦截,而非程序逻辑问题。
+        log.info(
+            "弹出托盘通知: %s(supportsMessages=%s)",
+            title,
+            self._tray.supportsMessages(),
+        )
+        self._tray.showMessage(
+            title, text, QSystemTrayIcon.MessageIcon.Information, 3000
+        )
 
     def update_state(self, hotkeys: dict, recent_files: list, autostart: bool) -> None:
         """根据最新配置重建菜单(热键文本 / 最近文件 / 自启勾选)。"""

@@ -13,6 +13,7 @@ os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 # headless(无 DISPLAY)环境可用 offscreen 平台做冒烟验证:
 #   QT_QPA_PLATFORM=offscreen python run.py
 
+from PySide6.QtCore import QTimer  # noqa: E402
 from PySide6.QtGui import QFont  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
@@ -50,8 +51,13 @@ def main() -> int:
 
     context.start()
     if not minimized:
-        context.tray.show_message(
-            "SnapOCR 截图精灵", "已在后台运行,右键托盘图标查看菜单"
+        # 延迟 1 秒再弹气泡:托盘图标刚 show() 时可能尚未在系统注册完,
+        # 立即 showMessage 会丢失通知(Qt 在 Windows 上的常见时序问题)。
+        QTimer.singleShot(
+            1000,
+            lambda: context.tray.show_message(
+                "SnapOCR 截图精灵", "已在后台运行,右键托盘图标查看菜单"
+            ),
         )
 
     return app.exec()
