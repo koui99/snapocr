@@ -129,3 +129,35 @@ QCheckBox {
     color: @text_main;
     spacing: 8px;
 }
+
+/* ---- OCR 结果窗(界面③) ---- */
+#ocrContent {
+    background-color: @bg_main;
+    border-radius: @radius_lg;
+}
+#ocrToolbar {
+    background-color: @bg_card;
+    border-bottom: 1px solid @border;
+}
+#ocrThumb {
+    background-color: @bg_card;
+    border: 1px dashed @border;
+    border-radius: @radius_sm;
+    color: @text_muted;
+}
+#ocrText {
+    border: 1px solid @border;
+    border-radius: @radius_sm;
+    background-color: @bg_main;
+    color: @text_main;
+    padding: 6px;
+}
+#ocrFooter {
+    background-color: @bg_card;
+    border-top: 1px solid @border;
+}
+#ocrStatus {
+    color: @text_muted;
+    font-size: 12px;
+}
+

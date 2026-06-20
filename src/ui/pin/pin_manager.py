@@ -19,10 +19,12 @@ log = get_logger("pin.manager")
 class PinManager:
     """贴图浮窗集合管理。"""
 
-    def __init__(self, config) -> None:
+    def __init__(self, config, ocr_handler=None) -> None:
         self._config = config
         self._pins: list[PinWindow] = []
         self._hidden = False
+        # OCR 请求回调:贴图右键「文字识别」时,把当前图像交给 app_context 弹结果窗
+        self._ocr_handler = ocr_handler
 
     # ---- 创建 ----
     def pin_image(self, image, at: QPoint | None = None) -> PinWindow | None:
@@ -34,6 +36,8 @@ class PinManager:
 
         win = PinWindow(pixmap, self._config)
         win.closed.connect(self._on_closed)
+        if self._ocr_handler is not None:
+            win.ocr_requested.connect(self._ocr_handler)
 
         center = at or QCursor.pos()
         win.move_center_to(center)

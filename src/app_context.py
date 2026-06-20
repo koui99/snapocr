@@ -32,9 +32,10 @@ class AppContext(QObject):
         self.config = ConfigManager()
         self.hotkeys = HotkeyManager()
         self.tray = TrayIcon()
-        self.pins = PinManager(self.config)
+        self.pins = PinManager(self.config, ocr_handler=self.open_ocr)
         self._settings_dialog: SettingsDialog | None = None
         self._screenshot_windows: list = []
+        self._ocr_windows: list = []
 
         self._wire()
         self._apply_hotkeys()
@@ -73,6 +74,8 @@ class AppContext(QObject):
             self._pin_from_clipboard()
         elif action == "toggle_pin":
             self.pins.toggle_all()
+        elif action == "ocr":
+            self._ocr_from_clipboard()
         else:
             self._placeholder_feature(action)
 
@@ -83,7 +86,7 @@ class AppContext(QObject):
         elif action in ("pin", "pin_clipboard"):
             self._pin_from_clipboard()
         elif action == "ocr":
-            self._placeholder_feature("ocr")
+            self._ocr_from_clipboard()
         elif action == "settings":
             self.open_settings()
         elif action == "help":
@@ -98,6 +101,36 @@ class AppContext(QObject):
         """从剪贴板贴图;无图时提示。"""
         if self.pins.pin_from_clipboard() is None:
             self.tray.show_message("SnapOCR", "剪贴板没有图片,无法贴图")
+
+    # ---- 文字识别(M4)----
+    def _ocr_from_clipboard(self) -> None:
+        """F4 / 托盘「文字识别」:取剪贴板图片弹 OCR 结果窗;无图时提示。"""
+        from PySide6.QtGui import QGuiApplication
+
+        image = QGuiApplication.clipboard().image()
+        if image is None or image.isNull():
+            self.tray.show_message("SnapOCR", "剪贴板没有图片,无法识别文字")
+            return
+        self.open_ocr(image)
+
+    def open_ocr(self, image: QImage) -> None:
+        """弹出 OCR 结果窗(截图「识别」/ 贴图右键 / F4 / 托盘 共用此出口)。"""
+        if image is None or image.isNull():
+            log.warning("OCR 请求收到空图,忽略")
+            return
+        from src.ui.ocr import OcrResultWindow
+
+        win = OcrResultWindow(image, self.config)
+        win.closed.connect(self._forget_ocr_window)
+        self._ocr_windows.append(win)
+        win.show()
+        win.raise_()
+        win.activateWindow()
+        log.info("已打开 OCR 结果窗(当前共 %d 个)", len(self._ocr_windows))
+
+    def _forget_ocr_window(self, win) -> None:
+        if win in self._ocr_windows:
+            self._ocr_windows.remove(win)
 
     def start_screenshot(self) -> None:
         log.info("触发截图流程")
@@ -155,10 +188,8 @@ class AppContext(QObject):
             self.pins.pin_image(image)
             log.info("已将截图钉到桌面")
         elif action == "ocr":
-            # M4 OCR 占位
-            ScreenshotWriter.copy_to_clipboard(image)
-            log.info("[占位] 文字识别(OCR)将在 M4 实现(已先复制到剪贴板)")
-            self.tray.show_message("SnapOCR", "[占位] 文字识别将在 M4 实现")
+            # M4:截图合成后直接弹 OCR 结果窗识别
+            self.open_ocr(image)
         else:
             log.warning("未知截图动作:%s", action)
 
@@ -236,6 +267,12 @@ class AppContext(QObject):
         log.info("退出 SnapOCR")
         self.hotkeys.unregister_all()
         self.pins.close_all()
+        for win in list(self._ocr_windows):
+            try:
+                win.close()
+            except Exception:
+                pass
+        self._ocr_windows.clear()
         self.config.save()
         self.tray.hide()
         QApplication.quit()

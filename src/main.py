@@ -10,6 +10,9 @@ import sys
 
 # 高 DPI:在 QApplication 创建前设置(Qt6 默认已启用缩放,这里显式声明以防万一)。
 os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
+# 限制 ONNX/OpenMP 推理线程数:避免 OCR 识别时铺满所有核心导致 UI 卡顿与风扇暴转(M4)。
+os.environ.setdefault("OMP_NUM_THREADS", "2")
+os.environ.setdefault("MKL_NUM_THREADS", "2")
 # headless(无 DISPLAY)环境可用 offscreen 平台做冒烟验证:
 #   QT_QPA_PLATFORM=offscreen python run.py
 

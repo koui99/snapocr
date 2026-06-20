@@ -89,6 +89,7 @@ class PinWindow(QWidget):
     """单个贴图浮窗。"""
 
     closed = Signal(object)  # 关闭时发射自身,供 PinManager 清理引用
+    ocr_requested = Signal(object)  # 请求 OCR,载荷为当前图像 QImage(交由 app_context 弹结果窗)
 
     def __init__(self, pixmap: QPixmap, config, parent=None):
         super().__init__(parent)
@@ -228,7 +229,7 @@ class PinWindow(QWidget):
         act_save.triggered.connect(self.save_image)
 
         act_ocr = menu.addAction("文字识别 (OCR)")
-        act_ocr.triggered.connect(self._ocr_placeholder)
+        act_ocr.triggered.connect(self._request_ocr)
 
         menu.addSeparator()
         self._build_submenus(menu)
@@ -250,8 +251,9 @@ class PinWindow(QWidget):
         menu.exec(global_pos)
         menu.deleteLater()  # 显式回收,避免反复右键累积 QMenu 实例
 
-    def _ocr_placeholder(self) -> None:
-        log.info("[占位] 贴图文字识别(OCR)将在 M4 实现")
+    def _request_ocr(self) -> None:
+        """请求对当前贴图做 OCR;发出体现旋转的图像,由 app_context 弹结果窗。"""
+        self.ocr_requested.emit(self._output_image())
 
     # ---- 交互事件(由 _PinCanvas 转发)----
     def on_press(self, event) -> None:

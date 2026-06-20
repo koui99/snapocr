@@ -15,7 +15,13 @@ from PySide6.QtWidgets import (
 from src.config.settings import DEFAULT_CONFIG
 from src.ui.components.shadow_widget import apply_shadow
 from src.ui.components.title_bar import TitleBar
-from src.ui.settings.pages import AboutPage, GeneralPage, HotkeyPage, PlaceholderPage
+from src.ui.settings.pages import (
+    AboutPage,
+    GeneralPage,
+    HotkeyPage,
+    OcrPage,
+    PlaceholderPage,
+)
 
 # 导航项顺序需与 _build_body 中 _pages 构造顺序一一对应
 _NAV = ["常规", "热键", "截屏", "贴图", "输出", "文字识别(OCR)", "关于"]
@@ -71,13 +77,14 @@ class SettingsDialog(QDialog):
 
         hotkeys = config.get("hotkeys", DEFAULT_CONFIG["hotkeys"])
         general = config.get("general", DEFAULT_CONFIG["general"])
+        ocr = config.get("ocr", DEFAULT_CONFIG["ocr"])
         self._pages = [
             GeneralPage(general),
             HotkeyPage(hotkeys),
             PlaceholderPage("截屏"),
             PlaceholderPage("贴图"),
             PlaceholderPage("输出"),
-            PlaceholderPage("文字识别(OCR)"),
+            OcrPage(ocr),
             AboutPage(),
         ]
         for p in self._pages:

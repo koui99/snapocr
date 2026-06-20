@@ -120,6 +120,47 @@ class PlaceholderPage(BasePage):
         self.add_stretch()
 
 
+class OcrPage(BasePage):
+    """文字识别(OCR)页:默认识别语言 + 自动复制 + 模型说明。"""
+
+    def __init__(self, ocr: dict, parent=None) -> None:
+        super().__init__("文字识别(OCR)", parent)
+        from src.core.ocr.engine import LANG_OPTIONS
+
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        self._lang = QComboBox()
+        for value, label in LANG_OPTIONS:
+            self._lang.addItem(label, value)
+        current = ocr.get("default_lang", "mix")
+        idx = self._lang.findData(current)
+        self._lang.setCurrentIndex(idx if idx >= 0 else 0)
+        form.addRow("默认识别语言", self._lang)
+
+        self._auto_copy = QCheckBox("识别完成后自动复制全部文本")
+        self._auto_copy.setChecked(bool(ocr.get("auto_copy", False)))
+        form.addRow("自动复制", self._auto_copy)
+
+        container = QWidget()
+        container.setLayout(form)
+        self.add_widget(container)
+
+        note = QLabel("内置本地离线模型(中英混合),识别不联网、不上传图片。")
+        note.setProperty("hint", "true")
+        note.setWordWrap(True)
+        self.add_widget(note)
+        self.add_stretch()
+
+    def collect(self) -> dict:
+        return {
+            "ocr": {
+                "default_lang": self._lang.currentData(),
+                "auto_copy": self._auto_copy.isChecked(),
+            }
+        }
+
+
 class AboutPage(BasePage):
     """关于页:产品名 + 版本。"""
 

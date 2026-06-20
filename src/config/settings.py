@@ -33,6 +33,10 @@ DEFAULT_CONFIG: dict = {
         "format": "png",
         "quality": 90,
     },
+    "ocr": {
+        "default_lang": "mix",   # mix=中英混合(内置) / en=仅英文
+        "auto_copy": False,      # 识别完成后自动把文本复制到剪贴板
+    },
     "recent_files": [],
 }
 
