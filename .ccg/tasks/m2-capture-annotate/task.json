@@ -1,0 +1,42 @@
+{
+  "id": "m2-capture-annotate",
+  "title": "M2 截图选区 + 标注:全屏取屏遮罩 + 拖拽选区 + 全套标注工具 + 复制/保存",
+  "status": "in-progress",
+  "strategy": "full-collaborate",
+  "currentPhase": "3-implementation",
+  "nextAction": "本机 py_compile 全过 + 独立代理对抗审查 → Windows 真机按 README M2 清单验证 → Phase 4 agy 双模型 review → 归档",
+  "gate": null,
+  "branch": "main",
+  "scope": "m2-capture-annotate",
+  "createdAt": "2026-06-20T00:00:00Z",
+  "implementation": {
+    "doneAt": "2026-06-20",
+    "summary": "在 agy 已写的选区/放大镜/截屏基础上,补齐整个标注子系统(约70%)并修3个遗留bug。",
+    "bugfixes": [
+      "capture.py 缺 import Qt(headless Mock 路径 NameError)→ 已加",
+      "writer.py ensure_parent(...).parent 崩 → 重写,改用 paths.data_dir()",
+      "writer.py 每次确认强制存盘 → 拆分 compose_image/copy_to_clipboard/save_to_file,复制与保存彻底分离"
+    ],
+    "newFiles": [
+      "core/screenshot/geometry.py 纯几何(点到线段/矩形边框距离)",
+      "core/screenshot/annotations.py 多态标注模型(矩形/椭圆/直线/箭头/画笔/马克笔/马赛克/文字/序号)+ generate_full_mosaic",
+      "ui/screenshot/commands.py 撤销命令(Add/Delete/Edit)",
+      "ui/screenshot/canvas.py AnnotationController 交互状态机",
+      "ui/screenshot/icons.py 内联 Lucide SVG → QIcon",
+      "ui/screenshot/property_bar.py 二级属性条(粗细+8色,自绘气泡)",
+      "ui/screenshot/toolbar.py 双排工具栏",
+      "ui/screenshot/text_overlay.py 文字就地输入浮层",
+      "tests/test_annotations.py 纯逻辑单测"
+    ],
+    "rewritten": [
+      "ui/screenshot/screenshot_window.py 整合选区+标注+工具栏,事件路由,合成输出 sig_result(QImage,action)",
+      "app_context.py 截图结果路由(复制/保存/钉图占位/OCR占位)"
+    ],
+    "localVerify": "Python3.14 无 PySide6 → 仅 py_compile(全过)+ 代码审查;真实运行在 Windows",
+    "knownLimits": [
+      "跨显示器选区不支持(每屏独立遮罩,M2 范围外)",
+      "马赛克绑定底图像素,不支持移动(整删重画)",
+      "钉图/OCR 为占位(M3/M4)"
+    ]
+  }
+}

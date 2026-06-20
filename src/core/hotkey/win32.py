@@ -1,42 +1,53 @@
-"""Windows 全局热键后端:ctypes 直调 user32.RegisterHotKey + Qt 原生事件过滤。
+"""Windows 全局热键后端:独立线程内注册 + 自跑 GetMessage 消息循环。
 
-仅在 sys.platform == "win32" 时由 base.HotkeyManager 惰性导入。零第三方依赖,
-打包成单 exe 时不引入额外 dll,最稳妥。
+为什么不用 Qt 的 nativeEventFilter:
+RegisterHotKey 的 WM_HOTKEY(无论绑定 NULL 还是真实 HWND)在 PySide6 下并不能
+可靠地经 QAbstractNativeEventFilter 投递(实测:注册成功但按键收不到)。因此改用
+最稳妥的方案——开一个专用线程,在该线程内 RegisterHotKey(NULL) 并自己跑
+GetMessage 循环;WM_HOTKEY 一定回到本线程队列,被我们直接取到,再回调上抛
+(经 Qt 信号的跨线程队列连接安全切回主线程)。零第三方依赖,打包单 exe 稳妥。
 """
 from __future__ import annotations
 
 import ctypes
+import threading
 from ctypes import wintypes
 from typing import Callable
-
-from PySide6.QtCore import QAbstractNativeEventFilter, QCoreApplication
 
 from src.core.logger import get_logger
 
 log = get_logger("hotkey.win32")
 
 _WM_HOTKEY = 0x0312
+_WM_APP_SYNC = 0x8000   # 自定义:请求(重新)同步注册
+_PM_REMOVE = 0x0001
+_ERROR_HOTKEY_ALREADY_REGISTERED = 1409
+
 _MOD = {
-    "ALT": 0x0001,
-    "CTRL": 0x0002,
-    "CONTROL": 0x0002,
-    "SHIFT": 0x0004,
-    "WIN": 0x0008,
-    "META": 0x0008,
+    "ALT": 0x0001, "CTRL": 0x0002, "CONTROL": 0x0002,
+    "SHIFT": 0x0004, "WIN": 0x0008, "META": 0x0008,
 }
-_MOD_NOREPEAT = 0x4000  # 防止长按重复触发(Win7+)
+_MOD_NOREPEAT = 0x4000
 
-_user32 = ctypes.windll.user32 if hasattr(ctypes, "windll") else None
+if hasattr(ctypes, "WinDLL"):
+    _user32 = ctypes.WinDLL("user32", use_last_error=True)
+    _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+else:  # 非 Windows(理论上不会走到,linux 用 Mock 后端)
+    _user32 = _kernel32 = None
 
-# 显式声明 argtypes/restype:64 位 Windows 下 HWND 是 64 位指针,
-# 不声明时 ctypes 默认按 c_int 处理会截断指针,可能偶发崩溃。
 if _user32 is not None:
-    _user32.RegisterHotKey.argtypes = [
-        wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT
-    ]
+    _LPMSG = ctypes.POINTER(wintypes.MSG)
+    _user32.RegisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
     _user32.RegisterHotKey.restype = wintypes.BOOL
     _user32.UnregisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int]
     _user32.UnregisterHotKey.restype = wintypes.BOOL
+    _user32.GetMessageW.argtypes = [_LPMSG, wintypes.HWND, wintypes.UINT, wintypes.UINT]
+    _user32.GetMessageW.restype = ctypes.c_int  # 可能返回 -1
+    _user32.PeekMessageW.argtypes = [_LPMSG, wintypes.HWND, wintypes.UINT, wintypes.UINT, wintypes.UINT]
+    _user32.PeekMessageW.restype = wintypes.BOOL
+    _user32.PostThreadMessageW.argtypes = [wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    _user32.PostThreadMessageW.restype = wintypes.BOOL
+    _kernel32.GetCurrentThreadId.restype = wintypes.DWORD
 
 _SPECIAL_VK = {
     "ESC": 0x1B, "ESCAPE": 0x1B, "SPACE": 0x20, "TAB": 0x09,
@@ -51,7 +62,7 @@ def _vk_from_key(key: str) -> int | None:
     key = key.strip().upper()
     if not key:
         return None
-    if key.startswith("F") and key[1:].isdigit():  # 功能键 F1-F24
+    if key.startswith("F") and key[1:].isdigit():
         n = int(key[1:])
         if 1 <= n <= 24:
             return 0x70 + (n - 1)  # VK_F1 = 0x70
@@ -78,23 +89,18 @@ def parse_sequence(sequence: str) -> tuple[int, int] | None:
     return mods | _MOD_NOREPEAT, vk
 
 
-class Win32HotkeyBackend(QAbstractNativeEventFilter):
-    """通过 RegisterHotKey 注册系统级热键,经 Qt 原生事件过滤器接收 WM_HOTKEY。"""
+class Win32HotkeyBackend:
+    """专用线程承载 RegisterHotKey + GetMessage 循环的全局热键后端。"""
 
     def __init__(self, on_trigger: Callable[[str], None]) -> None:
-        super().__init__()
         self._on_trigger = on_trigger
-        self._id_to_action: dict[int, str] = {}
-        self._next_id = 1
-        self._installed = False
+        self._desired: dict[str, tuple[int, int, str]] = {}  # action -> (mods, vk, sequence)
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+        self._tid: int | None = None
+        self._ready = threading.Event()
 
-    def _ensure_installed(self) -> None:
-        if not self._installed:
-            app = QCoreApplication.instance()
-            if app is not None:
-                app.installNativeEventFilter(self)
-                self._installed = True
-
+    # ---- 对外接口(主线程调用)----
     def register(self, action: str, sequence: str) -> bool:
         if _user32 is None:
             return False
@@ -103,32 +109,85 @@ class Win32HotkeyBackend(QAbstractNativeEventFilter):
             log.warning("无法解析快捷键:%s", sequence)
             return False
         mods, vk = parsed
-        self._ensure_installed()
-        hotkey_id = self._next_id
-        self._next_id += 1
-        ok = bool(_user32.RegisterHotKey(None, hotkey_id, mods, vk))
-        if ok:
-            self._id_to_action[hotkey_id] = action
-        else:
-            log.warning("RegisterHotKey 失败(可能被占用):%s=%s", action, sequence)
-        return ok
+        with self._lock:
+            self._desired[action] = (mods, vk, sequence)
+        self._ensure_thread()
+        self._post_sync()
+        return True
 
     def unregister_all(self) -> None:
-        if _user32 is None:
-            return
-        for hotkey_id in list(self._id_to_action):
-            _user32.UnregisterHotKey(None, hotkey_id)
-        self._id_to_action.clear()
+        with self._lock:
+            self._desired.clear()
+        self._post_sync()
 
-    def nativeEventFilter(self, eventType, message):  # noqa: N802 (Qt 接口命名)
-        # RegisterHotKey(NULL,...) 的 WM_HOTKEY 是线程消息,经 Qt 分发为
-        # b"windows_dispatcher_MSG";普通窗口消息才是 b"windows_generic_MSG"。
-        # 两者都需检查,否则全局热键收不到。
-        if eventType in (b"windows_generic_MSG", b"windows_dispatcher_MSG") and message:
-            msg = wintypes.MSG.from_address(int(message))
-            if msg.message == _WM_HOTKEY:
-                action = self._id_to_action.get(int(msg.wParam))
-                if action:
-                    self._on_trigger(action)
-        # 不拦截消息,交还给 Qt 继续处理
-        return False, 0
+    # ---- 线程与消息 ----
+    def _ensure_thread(self) -> None:
+        if self._thread is not None and self._thread.is_alive():
+            return
+        self._ready.clear()
+        self._thread = threading.Thread(target=self._run, name="SnapOCRHotkey", daemon=True)
+        self._thread.start()
+        self._ready.wait(2.0)  # 等 worker 建好消息队列并拿到 tid
+
+    def _post_sync(self) -> None:
+        if self._tid and _user32 is not None:
+            _user32.PostThreadMessageW(self._tid, _WM_APP_SYNC, 0, 0)
+
+    def _run(self) -> None:
+        if _user32 is None or _kernel32 is None:
+            return
+        self._tid = int(_kernel32.GetCurrentThreadId())
+        msg = wintypes.MSG()
+        # 主动 PeekMessage 触发本线程消息队列的创建,确保 PostThreadMessage 能投进来
+        _user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, _PM_REMOVE)
+        self._ready.set()
+        log.info("全局热键线程已启动(tid=%s)", self._tid)
+
+        id_to_action: dict[int, str] = {}
+        next_id = 1
+
+        def _resync() -> None:
+            for hid in list(id_to_action):
+                _user32.UnregisterHotKey(None, hid)
+            id_to_action.clear()
+            with self._lock:
+                desired = dict(self._desired)
+            nonlocal next_id
+            for action, (mods, vk, seq) in desired.items():
+                hid = next_id
+                next_id += 1
+                if _user32.RegisterHotKey(None, hid, mods, vk):
+                    id_to_action[hid] = action
+                    log.info("已注册全局热键:%s=%s(id=%d)", action, seq, hid)
+                else:
+                    err = ctypes.get_last_error()
+                    if err == _ERROR_HOTKEY_ALREADY_REGISTERED:
+                        log.warning("热键被其他程序占用:%s=%s(请换组合键)", action, seq)
+                    else:
+                        log.warning("RegisterHotKey 失败:%s=%s(错误码=%s)", action, seq, err)
+
+        _resync()  # 线程启动即应用一次当前期望集
+        try:
+            while True:
+                ret = _user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+                if ret in (0, -1):  # WM_QUIT 或错误
+                    break
+                if msg.message == _WM_HOTKEY:
+                    action = id_to_action.get(int(msg.wParam))
+                    if action:
+                        log.info("热键消息收到:%s", action)
+                        try:
+                            self._on_trigger(action)
+                        except Exception as e:
+                            log.error("热键回调异常:%s", e)
+                elif msg.message == _WM_APP_SYNC:
+                    # 合并连续的同步请求,只 resync 一次
+                    drain = wintypes.MSG()
+                    while _user32.PeekMessageW(ctypes.byref(drain), None,
+                                               _WM_APP_SYNC, _WM_APP_SYNC, _PM_REMOVE):
+                        pass
+                    _resync()
+        finally:
+            for hid in list(id_to_action):
+                _user32.UnregisterHotKey(None, hid)
+            id_to_action.clear()

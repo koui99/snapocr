@@ -1,24 +1,26 @@
 """应用业务协调器(Presenter):连接 UI 信号与 core 服务,持有共享状态。
 
-托盘 / 设置窗 / 热键的交互在此汇聚,UI 与 core 互不直接依赖。
-M1 阶段各功能动作(截屏/贴图/OCR)为占位:打日志 + 托盘提示。
+托盘 / 设置窗 / 热键 / 截图 / 贴图的交互在此汇聚,UI 与 core 互不直接依赖。
+截屏(M2)与贴图(M3)已接入真实流程;OCR(M4)仍为占位。
 """
 from __future__ import annotations
 
 import copy
+import os
 
 from PySide6.QtCore import QObject
+from PySide6.QtGui import QImage
 
 from src.config.settings import ConfigManager
 from src.core import startup
 from src.core.hotkey.base import ACTION_LABELS, HotkeyManager
 from src.core.logger import get_logger
+from src.ui.pin import PinManager
 from src.ui.settings.settings_dialog import SettingsDialog
 from src.ui.tray.tray_icon import TrayIcon
 
 log = get_logger("app_context")
 
-_FEATURE_ACTIONS = {"screenshot", "pin", "pin_clipboard", "ocr"}
 _ABOUT_PAGE_INDEX = 6
 
 
@@ -30,7 +32,9 @@ class AppContext(QObject):
         self.config = ConfigManager()
         self.hotkeys = HotkeyManager()
         self.tray = TrayIcon()
+        self.pins = PinManager(self.config)
         self._settings_dialog: SettingsDialog | None = None
+        self._screenshot_windows: list = []
 
         self._wire()
         self._apply_hotkeys()
@@ -61,14 +65,25 @@ class AppContext(QObject):
             or bool(self.config.get("general", "auto_start", False)),
         )
 
-    # ---- 热键触发(占位) ----
+    # ---- 热键触发 ----
     def _on_hotkey(self, action: str) -> None:
-        self._placeholder_feature(action)
+        if action == "screenshot":
+            self.start_screenshot()
+        elif action in ("pin", "pin_clipboard"):
+            self._pin_from_clipboard()
+        elif action == "toggle_pin":
+            self.pins.toggle_all()
+        else:
+            self._placeholder_feature(action)
 
     # ---- 托盘动作 ----
     def _on_tray_action(self, action: str) -> None:
-        if action in _FEATURE_ACTIONS:
-            self._placeholder_feature(action)
+        if action == "screenshot":
+            self.start_screenshot()
+        elif action in ("pin", "pin_clipboard"):
+            self._pin_from_clipboard()
+        elif action == "ocr":
+            self._placeholder_feature("ocr")
         elif action == "settings":
             self.open_settings()
         elif action == "help":
@@ -77,6 +92,93 @@ class AppContext(QObject):
             self.open_settings(page_index=_ABOUT_PAGE_INDEX)
         elif action == "quit":
             self.quit()
+
+    # ---- 贴图(M3)----
+    def _pin_from_clipboard(self) -> None:
+        """从剪贴板贴图;无图时提示。"""
+        if self.pins.pin_from_clipboard() is None:
+            self.tray.show_message("SnapOCR", "剪贴板没有图片,无法贴图")
+
+    def start_screenshot(self) -> None:
+        log.info("触发截图流程")
+        self._cleanup_screenshot_windows()
+
+        from src.core.screenshot.capture import CaptureEngine
+        screens_data = CaptureEngine.capture_all_screens()
+
+        from PySide6.QtWidgets import QApplication
+        from src.ui.screenshot.screenshot_window import ScreenshotWindow
+
+        qt_screens = QApplication.screens()
+        for idx, screen in enumerate(qt_screens):
+            cap_data = screens_data.get(idx, screens_data.get(0))
+            if not cap_data:
+                log.error("无法获取屏幕 %d 的抓帧数据", idx)
+                continue
+
+            win = ScreenshotWindow(screen, cap_data, self.config)
+            win.sig_canceled.connect(self._on_screenshot_canceled)
+            win.sig_result.connect(self._on_screenshot_result)
+
+            self._screenshot_windows.append(win)
+
+        for win in self._screenshot_windows:
+            win.show()
+            win.raise_()
+            win.activateWindow()
+
+    def _on_screenshot_canceled(self) -> None:
+        log.info("用户取消了截图")
+        self._cleanup_screenshot_windows()
+
+    def _on_screenshot_result(self, image: QImage, action: str) -> None:
+        """截图窗口合成完成后的统一出口:按动作路由复制 / 保存 / 钉图 / OCR。"""
+        from src.core.screenshot.writer import ScreenshotWriter
+
+        if image is None or image.isNull():
+            log.warning("收到空的合成图,忽略")
+            self._cleanup_screenshot_windows()
+            return
+
+        if action == "copy":
+            ScreenshotWriter.copy_to_clipboard(image)
+            self.tray.show_message("SnapOCR", "截图已复制到剪贴板")
+        elif action == "save":
+            path = ScreenshotWriter.save_to_file(image, self.config)
+            if path:
+                self._remember_recent(path)
+                self.tray.show_message("SnapOCR", f"截图已保存:\n{os.path.basename(path)}")
+            else:
+                self.tray.show_message("SnapOCR", "截图保存失败,请检查保存目录")
+        elif action == "pin":
+            # M3:把合成图直接钉到桌面
+            self.pins.pin_image(image)
+            log.info("已将截图钉到桌面")
+        elif action == "ocr":
+            # M4 OCR 占位
+            ScreenshotWriter.copy_to_clipboard(image)
+            log.info("[占位] 文字识别(OCR)将在 M4 实现(已先复制到剪贴板)")
+            self.tray.show_message("SnapOCR", "[占位] 文字识别将在 M4 实现")
+        else:
+            log.warning("未知截图动作:%s", action)
+
+        self._cleanup_screenshot_windows()
+
+    def _remember_recent(self, path: str) -> None:
+        recents = self.config.data.setdefault("recent_files", [])
+        if path not in recents:
+            recents.insert(0, path)
+            self.config.data["recent_files"] = recents[:10]
+            self.config.save()
+            self._refresh_tray()
+
+    def _cleanup_screenshot_windows(self) -> None:
+        for win in self._screenshot_windows:
+            try:
+                win.close()
+            except Exception:
+                pass
+        self._screenshot_windows.clear()
 
     def _placeholder_feature(self, action: str) -> None:
         label = ACTION_LABELS.get(action, action)
@@ -133,6 +235,7 @@ class AppContext(QObject):
 
         log.info("退出 SnapOCR")
         self.hotkeys.unregister_all()
+        self.pins.close_all()
         self.config.save()
         self.tray.hide()
         QApplication.quit()

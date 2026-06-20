@@ -1,10 +1,10 @@
-# SnapOCR(截图精灵)M1 依赖
+# SnapOCR(截图精灵)依赖
 # 建议 Python 3.11–3.13:PySide6 对 Python 3.14 可能尚无官方 wheel。
 # Windows 验证时若 3.14 安装失败,请改用 3.12:  py -3.12 -m venv .venv
 
 PySide6>=6.6,<6.9
+mss>=9.0            # M2 跨平台截屏取帧(缺失时自动降级 QScreen/Mock)
 
-# 以下为后续里程碑预留(M1 不需要,勿提前安装):
-# mss            # M2 截图取屏
+# 以下为后续里程碑预留(勿提前安装):
 # rapidocr-onnxruntime  # M4 本地 OCR
 # pyinstaller    # M5 打包
