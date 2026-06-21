@@ -48,6 +48,17 @@ class AppContext(QObject):
         self.tray.show()
         log.info("SnapOCR 已启动并常驻托盘")
 
+    # ---- 用户反馈 ----
+    def notify(self, text: str) -> None:
+        """统一的即时反馈:优先自绘 Toast 浮层(不会被 Windows 专注助手拦截),
+        Toast 不可用时回退托盘气泡。"""
+        try:
+            from src.ui.components.toast import Toast
+            Toast.show_text(text)
+        except Exception as e:
+            log.warning("Toast 失败,回退托盘气泡:%s", e)
+            self.tray.show_message("SnapOCR", text)
+
     # ---- 信号连线 ----
     def _wire(self) -> None:
         self.hotkeys.triggered.connect(self._on_hotkey)
@@ -70,7 +81,9 @@ class AppContext(QObject):
     def _on_hotkey(self, action: str) -> None:
         if action == "screenshot":
             self.start_screenshot()
-        elif action in ("pin", "pin_clipboard"):
+        elif action == "pin":
+            self._pin_smart()
+        elif action == "pin_clipboard":
             self._pin_from_clipboard()
         elif action == "toggle_pin":
             self.pins.toggle_all()
@@ -83,7 +96,9 @@ class AppContext(QObject):
     def _on_tray_action(self, action: str) -> None:
         if action == "screenshot":
             self.start_screenshot()
-        elif action in ("pin", "pin_clipboard"):
+        elif action == "pin":
+            self._pin_smart()
+        elif action == "pin_clipboard":
             self._pin_from_clipboard()
         elif action == "ocr":
             self._ocr_from_clipboard()
@@ -97,10 +112,18 @@ class AppContext(QObject):
             self.quit()
 
     # ---- 贴图(M3)----
+    def _pin_smart(self) -> None:
+        """「贴图」:剪贴板有图直接钉到桌面;没图则自动发起截图(选区后钉图)。"""
+        if self.pins.pin_from_clipboard() is not None:
+            return
+        log.info("剪贴板无图,贴图改为发起截图")
+        self.notify("剪贴板没有图片,已为你打开截图")
+        self.start_screenshot(default_action="pin")
+
     def _pin_from_clipboard(self) -> None:
-        """从剪贴板贴图;无图时提示。"""
+        """「从剪贴板贴图」:明确只贴剪贴板图;无图时轻提示(不再静默)。"""
         if self.pins.pin_from_clipboard() is None:
-            self.tray.show_message("SnapOCR", "剪贴板没有图片,无法贴图")
+            self.notify("剪贴板没有图片,无法贴图")
 
     # ---- 文字识别(M4)----
     def _ocr_from_clipboard(self) -> None:
@@ -109,7 +132,7 @@ class AppContext(QObject):
 
         image = QGuiApplication.clipboard().image()
         if image is None or image.isNull():
-            self.tray.show_message("SnapOCR", "剪贴板没有图片,无法识别文字")
+            self.notify("剪贴板没有图片,无法识别文字")
             return
         self.open_ocr(image)
 
@@ -132,8 +155,8 @@ class AppContext(QObject):
         if win in self._ocr_windows:
             self._ocr_windows.remove(win)
 
-    def start_screenshot(self) -> None:
-        log.info("触发截图流程")
+    def start_screenshot(self, default_action: str = "copy") -> None:
+        log.info("触发截图流程(默认动作=%s)", default_action)
         self._cleanup_screenshot_windows()
 
         from src.core.screenshot.capture import CaptureEngine
@@ -149,7 +172,7 @@ class AppContext(QObject):
                 log.error("无法获取屏幕 %d 的抓帧数据", idx)
                 continue
 
-            win = ScreenshotWindow(screen, cap_data, self.config)
+            win = ScreenshotWindow(screen, cap_data, self.config, default_action=default_action)
             win.sig_canceled.connect(self._on_screenshot_canceled)
             win.sig_result.connect(self._on_screenshot_result)
 
@@ -175,14 +198,14 @@ class AppContext(QObject):
 
         if action == "copy":
             ScreenshotWriter.copy_to_clipboard(image)
-            self.tray.show_message("SnapOCR", "截图已复制到剪贴板")
+            self.notify("截图已复制到剪贴板")
         elif action == "save":
             path = ScreenshotWriter.save_to_file(image, self.config)
             if path:
                 self._remember_recent(path)
-                self.tray.show_message("SnapOCR", f"截图已保存:\n{os.path.basename(path)}")
+                self.notify(f"截图已保存:{os.path.basename(path)}")
             else:
-                self.tray.show_message("SnapOCR", "截图保存失败,请检查保存目录")
+                self.notify("截图保存失败,请检查保存目录")
         elif action == "pin":
             # M3:把合成图直接钉到桌面
             self.pins.pin_image(image)

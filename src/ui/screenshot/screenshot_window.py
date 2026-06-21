@@ -43,11 +43,13 @@ class ScreenshotWindow(QWidget):
     # 合成结果上抛:(合成图, 动作)  动作 ∈ {"copy","save","pin","ocr"}
     sig_result = Signal(QImage, str)
 
-    def __init__(self, screen, cap_data: dict, config, parent=None):
+    def __init__(self, screen, cap_data: dict, config, parent=None, default_action: str = "copy"):
         super().__init__(parent)
         self.screen_obj = screen
         self.config = config
         self.device_ratio = screen.devicePixelRatio()
+        # 「确认」(Enter / 双击 / ✓)默认执行的动作:普通截图=copy;「贴图」发起的截图=pin
+        self._default_action = default_action if default_action in ("copy", "save", "pin", "ocr") else "copy"
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -279,8 +281,8 @@ class ScreenshotWindow(QWidget):
             return
         pos = event.position().toPoint()
         if not self.annotation_mode and self.tracker.hit_test(pos) == "inside":
-            # 选区内双击 = 确认(复制)
-            self._emit_result("copy")
+            # 选区内双击 = 确认(默认动作:普通截图=复制;贴图发起=钉图)
+            self._emit_result(self._default_action)
 
     # ================= 键盘 =================
     def keyPressEvent(self, event: QKeyEvent):
@@ -293,7 +295,7 @@ class ScreenshotWindow(QWidget):
                 self.sig_canceled.emit()
             return
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self._emit_result("copy")
+            self._emit_result(self._default_action)
             return
         if mods & Qt.KeyboardModifier.ControlModifier:
             if key == Qt.Key.Key_Z and (mods & Qt.KeyboardModifier.ShiftModifier):
@@ -358,7 +360,7 @@ class ScreenshotWindow(QWidget):
         elif action == "cancel":
             self.sig_canceled.emit()
         elif action == "confirm":
-            self._emit_result("copy")
+            self._emit_result(self._default_action)
 
     def _show_toolbar(self):
         self.toolbar.adjustSize()

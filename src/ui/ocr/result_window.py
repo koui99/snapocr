@@ -161,11 +161,16 @@ class OcrResultWindow(QWidget):
         self._btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_copy.clicked.connect(self._copy_all)
 
+        self._btn_close = QPushButton("关闭")
+        self._btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_close.clicked.connect(self.close)
+
         row.addWidget(self._status)
         row.addStretch(1)
         row.addWidget(self._btn_translate)
         row.addWidget(self._btn_save)
         row.addWidget(self._btn_copy)
+        row.addWidget(self._btn_close)
         return footer
 
     def _refresh_thumb(self) -> None:

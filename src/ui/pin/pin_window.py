@@ -270,8 +270,9 @@ class PinWindow(QWidget):
         self._drag_offset = None
 
     def on_double_click(self, event) -> None:
+        # 双击销毁贴图(「恢复100%」保留在右键菜单)
         if event.button() == Qt.MouseButton.LeftButton:
-            self.reset_scale()
+            self.close()
 
     def on_wheel(self, event) -> None:
         delta = event.angleDelta().y()
