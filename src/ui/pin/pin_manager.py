@@ -43,12 +43,12 @@ class PinManager:
             win.ocr_requested.connect(self._ocr_handler)
 
         if at_topleft is not None:
+            # 原位贴回:坐标本就在屏内,不做 clamp(否则阴影留白会把贴图顶偏 16px)
             win.move_content_to(at_topleft)
-            anchor = at_topleft
         else:
             anchor = at or QCursor.pos()
             win.move_center_to(anchor)
-        self._clamp_to_screen(win, anchor)
+            self._clamp_to_screen(win, anchor)
 
         win.show()
         win.raise_()

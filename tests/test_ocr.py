@@ -70,3 +70,13 @@ def test_ocr_result_defaults():
     assert r.lines == []
     assert r.avg_confidence == 0.0
     assert r.elapsed_ms == 0.0
+
+
+def test_ocr_line_box_optional():
+    from src.core.ocr.engine import OcrLine
+    # box 默认 None(剪贴板/老路径无坐标)
+    assert OcrLine(text="x", score=0.9).box is None
+    # 带坐标(原地叠加用)
+    ln = OcrLine(text="y", score=0.8, box=[[0, 0], [5, 0], [5, 2], [0, 2]])
+    assert ln.box[1][0] == 5
+

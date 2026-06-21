@@ -33,6 +33,9 @@ _MAX_SCALE = 8.0
 _WHEEL_STEP = 1.1
 _OPACITY_LEVELS = [100, 80, 60, 40, 20]
 
+# 模块级集合:持有贴图原地 OCR 的后台线程,防止跑完前被 Python GC 回收
+_PIN_OCR_WORKERS: set = set()
+
 
 def clamp_scale(scale: float) -> float:
     """把缩放比例钳制到 [_MIN_SCALE, _MAX_SCALE]。"""
@@ -113,6 +116,8 @@ class PinWindow(QWidget):
 
         self._canvas = _PinCanvas(self)
         apply_shadow(self._canvas, heavy=True)
+        self._ocr_overlay = None   # 懒建:贴图上的 OCR 可选文字浮层
+        self._ocr_worker = None    # 原地识别后台线程
 
         self._refresh()
 
@@ -147,6 +152,10 @@ class PinWindow(QWidget):
             self.move(old_center.x() - new_w // 2, old_center.y() - new_h // 2)
         self._canvas.setGeometry(_MARGIN, _MARGIN, cw, ch)
         self._canvas.update()
+        # OCR 文字浮层跟随 canvas 尺寸与缩放
+        if self._ocr_overlay is not None and self._ocr_overlay.has_fields():
+            self._ocr_overlay.setGeometry(0, 0, cw, ch)
+            self._ocr_overlay.reposition(self._scale)
 
     # ---- 定位(由 PinManager 调用)----
     def move_center_to(self, point: QPoint) -> None:
@@ -171,6 +180,10 @@ class PinWindow(QWidget):
 
     def rotate(self, delta: int) -> None:
         self._angle = (self._angle + delta) % 360
+        # 旋转后原坐标系失效,清掉 OCR 文字浮层(避免错位);需要可重新识别
+        if self._ocr_overlay is not None and self._ocr_overlay.has_fields():
+            self._ocr_overlay.clear_fields()
+            self._ocr_overlay.hide()
         self._refresh()
 
     def set_opacity(self, percent: int) -> None:
@@ -257,8 +270,62 @@ class PinWindow(QWidget):
         menu.deleteLater()  # 显式回收,避免反复右键累积 QMenu 实例
 
     def _request_ocr(self) -> None:
-        """请求对当前贴图做 OCR;发出体现旋转的图像,由 app_context 弹结果窗。"""
-        self.ocr_requested.emit(self._output_image())
+        """贴图右键「文字识别」:在贴图上原地叠加可选文字(图不动);再点一次则隐藏。
+        旋转态(角度≠0)坐标无法简单映射,降级为弹结果窗(发 ocr_requested)。"""
+        # 已有浮层 → 切换隐藏(再识别)
+        if self._ocr_overlay is not None and self._ocr_overlay.has_fields():
+            self._ocr_overlay.clear_fields()
+            self._ocr_overlay.hide()
+            return
+        if self._angle % 360 != 0:
+            # 旋转态退回独立结果窗
+            self.ocr_requested.emit(self._output_image())
+            return
+        if self._ocr_worker is not None and self._ocr_worker.isRunning():
+            return
+        from src.ui.ocr.worker import OcrWorker, qimage_to_png_bytes
+
+        image_bytes = qimage_to_png_bytes(self._orig.toImage())
+        if not image_bytes:
+            log.warning("贴图 OCR:图像为空")
+            return
+        lang = "mix"
+        if self.config is not None:
+            lang = self.config.get("ocr", "default_lang", "mix")
+        worker = OcrWorker(image_bytes, lang)
+        self._ocr_worker = worker
+        _PIN_OCR_WORKERS.add(worker)
+        worker.sig_done.connect(self._on_ocr_done)
+        worker.finished.connect(lambda w=worker: _PIN_OCR_WORKERS.discard(w))
+        worker.finished.connect(self._clear_ocr_worker_ref)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+        log.info("贴图原地 OCR 已发起")
+
+    def _clear_ocr_worker_ref(self) -> None:
+        # 线程结束后置空引用,避免下次 _request_ocr 误判 isRunning 或回调悬空对象
+        self._ocr_worker = None
+
+    def _on_ocr_done(self, result) -> None:
+        if not result.ok:
+            log.warning("贴图 OCR 失败:%s", result.error)
+            return
+        if not result.lines:
+            log.info("贴图 OCR:未识别到文字")
+            return
+        if self._angle % 360 != 0:
+            # 识别中途用户旋转了贴图 → 原坐标已失效,退回弹结果窗
+            self.ocr_requested.emit(self._output_image())
+            return
+        from src.ui.pin.ocr_overlay import OcrTextOverlay
+
+        if self._ocr_overlay is None:
+            self._ocr_overlay = OcrTextOverlay(self._canvas)
+        cw = max(1, self.display_pixmap.width()) if self.display_pixmap else self._canvas.width()
+        ch = max(1, self.display_pixmap.height()) if self.display_pixmap else self._canvas.height()
+        self._ocr_overlay.setGeometry(0, 0, cw, ch)
+        placed = self._ocr_overlay.build(result.lines, self._scale)
+        log.info("贴图原地 OCR:叠加 %d 行可选文字", placed)
 
     # ---- 交互事件(由 _PinCanvas 转发)----
     def on_press(self, event) -> None:
@@ -305,5 +372,12 @@ class PinWindow(QWidget):
         self._canvas.setFocus()
 
     def closeEvent(self, event) -> None:
+        # 断开原地 OCR 回调,避免后台线程稍后回调已销毁的窗口
+        if self._ocr_worker is not None:
+            try:
+                self._ocr_worker.sig_done.disconnect(self._on_ocr_done)
+            except (TypeError, RuntimeError):
+                pass
+            self._ocr_worker = None
         self.closed.emit(self)
         super().closeEvent(event)
