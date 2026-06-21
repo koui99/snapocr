@@ -187,8 +187,9 @@ class AppContext(QObject):
         log.info("用户取消了截图")
         self._cleanup_screenshot_windows()
 
-    def _on_screenshot_result(self, image: QImage, action: str) -> None:
-        """截图窗口合成完成后的统一出口:按动作路由复制 / 保存 / 钉图 / OCR。"""
+    def _on_screenshot_result(self, image: QImage, action: str, origin=None) -> None:
+        """截图窗口合成完成后的统一出口:按动作路由复制 / 保存 / 钉图 / OCR。
+        origin 为选区左上角全局坐标,用于「钉图」原位贴回。"""
         from src.core.screenshot.writer import ScreenshotWriter
 
         if image is None or image.isNull():
@@ -207,9 +208,9 @@ class AppContext(QObject):
             else:
                 self.notify("截图保存失败,请检查保存目录")
         elif action == "pin":
-            # M3:把合成图直接钉到桌面
-            self.pins.pin_image(image)
-            log.info("已将截图钉到桌面")
+            # M3:把合成图原位钉到桌面(贴在选区原来的位置,体验同 Snipaste)
+            self.pins.pin_image(image, at_topleft=origin)
+            log.info("已将截图原位钉到桌面")
         elif action == "ocr":
             # M4:截图合成后直接弹 OCR 结果窗识别
             self.open_ocr(image)

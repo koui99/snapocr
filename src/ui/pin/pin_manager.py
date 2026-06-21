@@ -27,8 +27,11 @@ class PinManager:
         self._ocr_handler = ocr_handler
 
     # ---- 创建 ----
-    def pin_image(self, image, at: QPoint | None = None) -> PinWindow | None:
-        """把图片钉到桌面。image 可为 QImage 或 QPixmap;at 为期望中心点(默认光标处)。"""
+    def pin_image(self, image, at: QPoint | None = None,
+                  at_topleft: QPoint | None = None) -> PinWindow | None:
+        """把图片钉到桌面。image 可为 QImage 或 QPixmap。
+        at_topleft:内容左上角对齐的全局坐标(截图「钉图」原位贴回时用);
+        at:期望中心点(剪贴板贴图时用,默认光标处)。两者二选一,at_topleft 优先。"""
         pixmap = image if isinstance(image, QPixmap) else QPixmap.fromImage(image)
         if pixmap is None or pixmap.isNull():
             log.warning("贴图失败:图片为空")
@@ -39,9 +42,13 @@ class PinManager:
         if self._ocr_handler is not None:
             win.ocr_requested.connect(self._ocr_handler)
 
-        center = at or QCursor.pos()
-        win.move_center_to(center)
-        self._clamp_to_screen(win, center)
+        if at_topleft is not None:
+            win.move_content_to(at_topleft)
+            anchor = at_topleft
+        else:
+            anchor = at or QCursor.pos()
+            win.move_center_to(anchor)
+        self._clamp_to_screen(win, anchor)
 
         win.show()
         win.raise_()

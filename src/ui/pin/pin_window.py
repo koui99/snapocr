@@ -153,6 +153,11 @@ class PinWindow(QWidget):
         self.move(point.x() - self.width() // 2, point.y() - self.height() // 2)
         self._initialized = True  # 已完成首次定位,后续缩放/旋转保持中心
 
+    def move_content_to(self, global_topleft: QPoint) -> None:
+        """把贴图内容(去掉阴影留白)的左上角对齐到指定全局坐标 → 原位贴回。"""
+        self.move(global_topleft.x() - _MARGIN, global_topleft.y() - _MARGIN)
+        self._initialized = True
+
     # ---- 缩放 / 旋转 / 不透明度 / 置顶 ----
     def set_scale(self, scale: float) -> None:
         self._scale = clamp_scale(scale)

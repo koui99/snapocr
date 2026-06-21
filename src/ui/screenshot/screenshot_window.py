@@ -40,8 +40,8 @@ class ScreenshotWindow(QWidget):
 
     # 信号契约
     sig_canceled = Signal()
-    # 合成结果上抛:(合成图, 动作)  动作 ∈ {"copy","save","pin","ocr"}
-    sig_result = Signal(QImage, str)
+    # 合成结果上抛:(合成图, 动作, 选区左上角全局坐标)  动作 ∈ {"copy","save","pin","ocr"}
+    sig_result = Signal(QImage, str, QPoint)
 
     def __init__(self, screen, cap_data: dict, config, parent=None, default_action: str = "copy"):
         super().__init__(parent)
@@ -444,4 +444,6 @@ class ScreenshotWindow(QWidget):
         if image is None:
             log.warning("合成失败,选区无效")
             return
-        self.sig_result.emit(image, action)
+        # 选区左上角的全局屏幕坐标(窗口覆盖本屏,窗口左上=屏幕左上)→ 供「钉图」原位贴回
+        origin = self.mapToGlobal(rect.topLeft())
+        self.sig_result.emit(image, action, origin)
