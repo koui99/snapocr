@@ -19,7 +19,7 @@ log = get_logger("tray")
 class TrayIcon(QObject):
     """托盘图标与右键菜单封装。"""
 
-    # 通用动作:screenshot / pin / pin_clipboard / ocr / settings / help / about / quit
+    # 通用动作:screenshot / pin(钉剪贴板) / ocr / settings / help / about / quit
     action_triggered = Signal(str)
     recent_file_triggered = Signal(str)  # 最近文件路径
     autostart_toggled = Signal(bool)     # 开机启动勾选状态
@@ -75,8 +75,7 @@ class TrayIcon(QObject):
             )
 
         add("截屏", "screenshot", hotkeys.get("screenshot", ""))
-        add("贴图", "pin", hotkeys.get("pin", ""))
-        add("从剪贴板贴图", "pin_clipboard")
+        add("贴图(钉剪贴板的图)", "pin", hotkeys.get("pin", ""))
         add("文字识别", "ocr", hotkeys.get("ocr", ""))
 
         # 最近文件子菜单

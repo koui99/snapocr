@@ -82,9 +82,7 @@ class AppContext(QObject):
         if action == "screenshot":
             self.start_screenshot()
         elif action == "pin":
-            self._pin_smart()
-        elif action == "pin_clipboard":
-            self._pin_from_clipboard()
+            self._pin_clipboard()
         elif action == "toggle_pin":
             self.pins.toggle_all()
         elif action == "ocr":
@@ -97,9 +95,7 @@ class AppContext(QObject):
         if action == "screenshot":
             self.start_screenshot()
         elif action == "pin":
-            self._pin_smart()
-        elif action == "pin_clipboard":
-            self._pin_from_clipboard()
+            self._pin_clipboard()
         elif action == "ocr":
             self._ocr_from_clipboard()
         elif action == "settings":
@@ -112,32 +108,21 @@ class AppContext(QObject):
             self.quit()
 
     # ---- 贴图(M3)----
-    def _pin_smart(self) -> None:
-        """「贴图」:剪贴板有图直接钉到桌面;没图则自动发起截图(选区后钉图)。"""
-        if self.pins.pin_from_clipboard() is not None:
-            return
-        log.info("剪贴板无图,贴图改为发起截图")
-        self.notify("剪贴板没有图片,已为你打开截图")
-        self.start_screenshot(default_action="pin")
-
-    def _pin_from_clipboard(self) -> None:
-        """「从剪贴板贴图」:明确只贴剪贴板图;无图时轻提示(不再静默)。"""
+    def _pin_clipboard(self) -> None:
+        """「贴图」(F3 / 托盘):把剪贴板里的图直接钉成置顶浮窗(同 Snipaste,不截图);
+        剪贴板没图时轻提示。要把屏幕某块原位钉住,请用「截图」后点工具栏的「钉图」。"""
         if self.pins.pin_from_clipboard() is None:
-            self.notify("剪贴板没有图片,无法贴图")
+            self.notify("剪贴板没有图片,无法贴图(可先截图或复制一张图再按贴图)")
 
     # ---- 文字识别(M4)----
     def _ocr_from_clipboard(self) -> None:
-        """F4 / 托盘「文字识别」:取剪贴板图片弹 OCR 结果窗;无图时提示。"""
-        from PySide6.QtGui import QGuiApplication
-
-        image = QGuiApplication.clipboard().image()
-        if image is None or image.isNull():
-            self.notify("剪贴板没有图片,无法识别文字")
-            return
-        self.open_ocr(image)
+        """F4 / 托盘「文字识别」:把剪贴板图钉成浮窗 + 图下方原地展开文字面板,不弹独立窗。"""
+        if self.pins.pin_from_clipboard(then_ocr=True) is None:
+            self.notify("剪贴板没有图片,无法识别文字(可先截图或复制一张图)")
 
     def open_ocr(self, image: QImage) -> None:
-        """弹出 OCR 结果窗(截图「识别」/ 贴图右键 / F4 / 托盘 共用此出口)。"""
+        """弹独立 OCR 结果窗。现仅作降级出口:贴图处于旋转态、坐标排序失效时,
+        由 pin_window 的 ocr_requested 信号兜底走这里(正常路径均已改为图下方面板)。"""
         if image is None or image.isNull():
             log.warning("OCR 请求收到空图,忽略")
             return
@@ -187,9 +172,10 @@ class AppContext(QObject):
         log.info("用户取消了截图")
         self._cleanup_screenshot_windows()
 
-    def _on_screenshot_result(self, image: QImage, action: str, origin=None) -> None:
+    def _on_screenshot_result(self, image: QImage, action: str, origin=None,
+                              ratio: float = 1.0) -> None:
         """截图窗口合成完成后的统一出口:按动作路由复制 / 保存 / 钉图 / OCR。
-        origin 为选区左上角全局坐标,用于「钉图」原位贴回。"""
+        origin 为选区左上角全局坐标、ratio 为来源屏 DPI,均用于「钉图」原位且同尺寸贴回。"""
         from src.core.screenshot.writer import ScreenshotWriter
 
         if image is None or image.isNull():
@@ -208,12 +194,13 @@ class AppContext(QObject):
             else:
                 self.notify("截图保存失败,请检查保存目录")
         elif action == "pin":
-            # M3:把合成图原位钉到桌面(贴在选区原来的位置,体验同 Snipaste)
-            self.pins.pin_image(image, at_topleft=origin)
+            # M3:把合成图原位、同尺寸钉到桌面(贴在选区原来的位置,体验同 Snipaste)
+            self.pins.pin_image(image, at_topleft=origin, source_ratio=ratio)
             log.info("已将截图原位钉到桌面")
         elif action == "ocr":
-            # M4:截图合成后直接弹 OCR 结果窗识别
-            self.open_ocr(image)
+            # M4:截图「识别」→ 原位钉成浮窗并立刻原地叠可选文字(不跳窗,图不动)
+            self.pins.pin_image(image, at_topleft=origin, source_ratio=ratio, then_ocr=True)
+            log.info("已将截图原位钉图并原地识别")
         else:
             log.warning("未知截图动作:%s", action)
 

@@ -18,12 +18,17 @@ from src.core.logger import get_logger
 
 log = get_logger("ocr.engine")
 
-# 语言选项:value → (中文标签, 纯英文模型文件名或 None 表示用内置中英混合)
+# 语言选项:value → 中文标签。模型挂载见 _get_engine。
+# mix=内置中英混合;en/ja 需把对应模型(+日语还需字典)放到本包 models/ 目录才真正生效,
+# 缺文件则自动降级为内置中英混合(不假装支持)。
 LANG_OPTIONS = [
     ("mix", "中英混合(内置)"),
     ("en", "仅英文"),
+    ("ja", "日语"),
 ]
-_EN_REC_MODEL = "en_PP-OCRv3_rec_infer.onnx"  # 存在则「仅英文」真正切换,否则降级混合
+_EN_REC_MODEL = "en_PP-OCRv3_rec_infer.onnx"     # 存在则「仅英文」真正切换,否则降级混合
+_JA_REC_MODEL = "japan_PP-OCRv4_rec_mobile.onnx"  # 日语识别模型(onnx,PP-OCRv4 mobile)
+_JA_REC_KEYS = "japan_dict.txt"                   # 日语字符字典(必须与模型配套,否则乱码)
 
 
 @dataclass
@@ -140,6 +145,16 @@ class OcrEngine:
                     kwargs["rec_model_path"] = en_model
                 else:
                     log.info("未找到纯英文模型,降级为内置中英混合模型")
+            elif lang == "ja":
+                # 日语需「识别模型 + 配套字典」两者齐全才生效,缺任一则降级内置混合
+                ja_model = _bundled_model(_JA_REC_MODEL)
+                ja_keys = _bundled_model(_JA_REC_KEYS)
+                if ja_model and ja_keys:
+                    kwargs["rec_model_path"] = ja_model
+                    kwargs["rec_keys_path"] = ja_keys
+                else:
+                    log.info("未找到日语模型或字典(需 %s + %s),降级为内置中英混合模型",
+                             _JA_REC_MODEL, _JA_REC_KEYS)
             engine = RapidOCR(**kwargs)
             cls._engines[lang] = engine
             log.info("RapidOCR 引擎已初始化(lang=%s)", lang)

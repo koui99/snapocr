@@ -37,7 +37,7 @@ from src.core.ocr.engine import (
 )
 from src.ui.components.shadow_widget import apply_shadow
 from src.ui.components.title_bar import TitleBar
-from src.ui.ocr.worker import OcrWorker, qimage_to_png_bytes
+from src.ui.ocr.worker import OcrWorker, prepare_ocr_bytes
 
 log = get_logger("ocr.window")
 
@@ -194,7 +194,7 @@ class OcrResultWindow(QWidget):
     def _start_recognize(self) -> None:
         if self._worker is not None and self._worker.isRunning():
             return  # 正在识别,忽略重复触发
-        image_bytes = qimage_to_png_bytes(self._source)
+        image_bytes = prepare_ocr_bytes(self._source)
         if not image_bytes:
             self._status.setText("无法读取图片,识别已取消")
             return

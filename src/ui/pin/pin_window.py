@@ -8,11 +8,20 @@
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, QRect, Qt, Signal
+from PySide6.QtCore import (
+    QEasingCurve,
+    QPoint,
+    QRect,
+    QRectF,
+    Qt,
+    QVariantAnimation,
+    Signal,
+)
 from PySide6.QtGui import (
     QColor,
     QFont,
     QFontMetrics,
+    QLinearGradient,
     QPainter,
     QPen,
     QPixmap,
@@ -28,6 +37,7 @@ from src.ui.theme.tokens import COLORS
 log = get_logger("pin.window")
 
 _MARGIN = 16          # 阴影留白
+_PANEL_GAP = 6        # 图与下方 OCR 文字面板的间距
 _MIN_SCALE = 0.1
 _MAX_SCALE = 8.0
 _WHEEL_STEP = 1.1
@@ -48,8 +58,14 @@ class _PinCanvas(QWidget):
     def __init__(self, owner: "PinWindow"):
         super().__init__(owner)
         self._owner = owner
+        self._flash = 0.0  # 创建时高亮强度 0~1,由 PinWindow 的入场动画驱动
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def set_flash(self, value: float) -> None:
+        """设置入场高亮强度并重绘(0 = 无,1 = 最强)。"""
+        self._flash = max(0.0, min(1.0, value))
+        self.update()
 
     def paintEvent(self, event) -> None:
         owner = self._owner
@@ -59,10 +75,24 @@ class _PinCanvas(QWidget):
         if dp is not None and not dp.isNull():
             painter.drawPixmap(0, 0, dp)
 
-        # 1px 细边框
-        painter.setPen(QPen(QColor(0, 0, 0, 40), 1))
+        # 彩色渐变边框(蓝→紫→橙):抗锯齿 + 半像素内缩,保证四边等粗、明显彩色
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        grad = QLinearGradient(0, 0, self.width(), self.height())
+        grad.setColorAt(0.0, QColor("#2D7FF9"))   # 蓝
+        grad.setColorAt(0.5, QColor("#9B5DE5"))   # 紫
+        grad.setColorAt(1.0, QColor("#FF7A45"))   # 橙
+        pen = QPen(grad, 2)
+        pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
+        painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
+        painter.drawRect(QRectF(1, 1, self.width() - 2, self.height() - 2))
+
+        # 入场高亮:创建瞬间叠一道暖橙描边并渐隐,强化「钉成功了」的反馈
+        if self._flash > 0.0:
+            accent = QColor("#FF5A36")
+            accent.setAlpha(int(230 * self._flash))
+            painter.setPen(QPen(accent, 2))
+            painter.drawRect(QRectF(2, 2, self.width() - 4, self.height() - 4))
 
         # 右下角缩放徽标(rgba(0,0,0,0.6) 底 + 白字),还原 mockup
         text = f"{int(round(owner.scale * 100))}%"
@@ -94,10 +124,13 @@ class PinWindow(QWidget):
     closed = Signal(object)  # 关闭时发射自身,供 PinManager 清理引用
     ocr_requested = Signal(object)  # 请求 OCR,载荷为当前图像 QImage(交由 app_context 弹结果窗)
 
-    def __init__(self, pixmap: QPixmap, config, parent=None):
+    def __init__(self, pixmap: QPixmap, config, parent=None, source_ratio: float = 1.0):
         super().__init__(parent)
         self.config = config
         self._orig = QPixmap(pixmap)
+        # 捕获时的 DPI 缩放比:截图来的贴图按此把物理像素折算回逻辑尺寸,
+        # 使贴图与屏幕原区域「同样大小、同一位置」(剪贴板贴图无 DPI 信息,取 1.0)。
+        self._base_dpr = max(0.1, float(source_ratio))
         self._scale = 1.0
         self._angle = 0
         self._opacity = 100
@@ -116,8 +149,10 @@ class PinWindow(QWidget):
 
         self._canvas = _PinCanvas(self)
         apply_shadow(self._canvas, heavy=True)
-        self._ocr_overlay = None   # 懒建:贴图上的 OCR 可选文字浮层
+        self._ocr_panel = None     # 懒建:贴图下方的 OCR 文字面板
         self._ocr_worker = None    # 原地识别后台线程
+        self._flash_anim = None    # 入场高亮动画
+        self._flashed = False      # 入场高亮只播一次
 
         self._refresh()
 
@@ -126,10 +161,19 @@ class PinWindow(QWidget):
     def scale(self) -> float:
         return self._scale
 
+    def _canvas_logical_size(self) -> tuple[int, int]:
+        """当前显示图占用的逻辑尺寸(= 物理尺寸 ÷ DPI),即画布应占的逻辑像素。"""
+        dp = self.display_pixmap
+        if dp is not None and not dp.isNull():
+            return (max(1, int(round(dp.width() / self._base_dpr))),
+                    max(1, int(round(dp.height() / self._base_dpr))))
+        return max(1, self._canvas.width()), max(1, self._canvas.height())
+
     # ---- 尺寸刷新(缩放/旋转后重算,保持窗口中心不动)----
     def _compute_display(self) -> QPixmap:
         if self._orig.isNull():
             return QPixmap()
+        # 先按用户缩放重采样到物理目标尺寸
         sw = max(1, int(self._orig.width() * self._scale))
         sh = max(1, int(self._orig.height() * self._scale))
         dp = self._orig.scaled(sw, sh, Qt.AspectRatioMode.IgnoreAspectRatio,
@@ -137,25 +181,33 @@ class PinWindow(QWidget):
         if self._angle % 360 != 0:
             dp = dp.transformed(QTransform().rotate(self._angle),
                                 Qt.TransformationMode.SmoothTransformation)
+        # 关键:按捕获 DPI 标注,Qt 即以「逻辑尺寸 = 物理 ÷ DPI」绘制 →
+        # 贴图与屏幕原区域同样大小,且高分屏下不糊(保留物理分辨率细节)。
+        dp.setDevicePixelRatio(self._base_dpr)
         return dp
 
     def _refresh(self) -> None:
         self.display_pixmap = self._compute_display()
-        cw = max(1, self.display_pixmap.width())
-        ch = max(1, self.display_pixmap.height())
-        new_w, new_h = cw + 2 * _MARGIN, ch + 2 * _MARGIN
+        cw, ch = self._canvas_logical_size()
+
+        # OCR 文字面板(若有)接在图正下方,窗口向下加高;图本身位置不变
+        panel_on = self._ocr_panel is not None and self._ocr_panel.has_fields()
+        gap = _PANEL_GAP if panel_on else 0
+        panel_h = self._ocr_panel.desired_height() if panel_on else 0
+
+        new_w = cw + 2 * _MARGIN
+        new_h = ch + gap + panel_h + 2 * _MARGIN
 
         old_center = self.geometry().center()
         self.resize(new_w, new_h)
-        if self._initialized:
-            # 缩放/旋转后保持窗口中心不动(首次定位由 PinManager 负责)
+        # 缩放/旋转时保持窗口中心不动(更顺手);但有文字面板时不挪窗,
+        # 让图(canvas 恒在 _MARGIN,_MARGIN)留在原位、面板向下展开。
+        if self._initialized and not panel_on:
             self.move(old_center.x() - new_w // 2, old_center.y() - new_h // 2)
         self._canvas.setGeometry(_MARGIN, _MARGIN, cw, ch)
         self._canvas.update()
-        # OCR 文字浮层跟随 canvas 尺寸与缩放
-        if self._ocr_overlay is not None and self._ocr_overlay.has_fields():
-            self._ocr_overlay.setGeometry(0, 0, cw, ch)
-            self._ocr_overlay.reposition(self._scale)
+        if panel_on:
+            self._ocr_panel.setGeometry(_MARGIN, _MARGIN + ch + gap, cw, panel_h)
 
     # ---- 定位(由 PinManager 调用)----
     def move_center_to(self, point: QPoint) -> None:
@@ -180,10 +232,10 @@ class PinWindow(QWidget):
 
     def rotate(self, delta: int) -> None:
         self._angle = (self._angle + delta) % 360
-        # 旋转后原坐标系失效,清掉 OCR 文字浮层(避免错位);需要可重新识别
-        if self._ocr_overlay is not None and self._ocr_overlay.has_fields():
-            self._ocr_overlay.clear_fields()
-            self._ocr_overlay.hide()
+        # 旋转后清掉 OCR 文字面板(坐标/排序失效);需要可重新识别
+        if self._ocr_panel is not None and self._ocr_panel.has_fields():
+            self._ocr_panel.clear_fields()
+            self._ocr_panel.hide()
         self._refresh()
 
     def set_opacity(self, percent: int) -> None:
@@ -270,22 +322,33 @@ class PinWindow(QWidget):
         menu.deleteLater()  # 显式回收,避免反复右键累积 QMenu 实例
 
     def _request_ocr(self) -> None:
-        """贴图右键「文字识别」:在贴图上原地叠加可选文字(图不动);再点一次则隐藏。
-        旋转态(角度≠0)坐标无法简单映射,降级为弹结果窗(发 ocr_requested)。"""
-        # 已有浮层 → 切换隐藏(再识别)
-        if self._ocr_overlay is not None and self._ocr_overlay.has_fields():
-            self._ocr_overlay.clear_fields()
-            self._ocr_overlay.hide()
+        """贴图右键「文字识别」:在图下方展开可选文字面板;再点一次则收起(窗口高度还原)。
+        旋转态(角度≠0)坐标排序无意义,降级为弹结果窗(发 ocr_requested)。"""
+        # 已有面板 → 收起
+        if self._ocr_panel is not None and self._ocr_panel.has_fields():
+            self._ocr_panel.clear_fields()
+            self._ocr_panel.hide()
+            self._refresh()   # 收起后窗口高度还原
             return
+        self._start_ocr()
+
+    def start_inplace_ocr(self) -> None:
+        """供外部(截图「识别」直接钉图)调用:钉出后立刻识别并在图下方展开文字面板。"""
+        if self._ocr_panel is not None and self._ocr_panel.has_fields():
+            return  # 已有结果,不重复识别
+        self._start_ocr()
+
+    def _start_ocr(self) -> None:
+        """发起一次后台原地 OCR(图不动,识别完在图下方展开文字面板)。"""
         if self._angle % 360 != 0:
             # 旋转态退回独立结果窗
             self.ocr_requested.emit(self._output_image())
             return
         if self._ocr_worker is not None and self._ocr_worker.isRunning():
             return
-        from src.ui.ocr.worker import OcrWorker, qimage_to_png_bytes
+        from src.ui.ocr.worker import OcrWorker, prepare_ocr_bytes
 
-        image_bytes = qimage_to_png_bytes(self._orig.toImage())
+        image_bytes = prepare_ocr_bytes(self._orig.toImage())
         if not image_bytes:
             log.warning("贴图 OCR:图像为空")
             return
@@ -314,18 +377,18 @@ class PinWindow(QWidget):
             log.info("贴图 OCR:未识别到文字")
             return
         if self._angle % 360 != 0:
-            # 识别中途用户旋转了贴图 → 原坐标已失效,退回弹结果窗
+            # 识别中途用户旋转了贴图 → 退回弹结果窗
             self.ocr_requested.emit(self._output_image())
             return
-        from src.ui.pin.ocr_overlay import OcrTextOverlay
+        from src.ui.pin.ocr_overlay import OcrTextPanel
 
-        if self._ocr_overlay is None:
-            self._ocr_overlay = OcrTextOverlay(self._canvas)
-        cw = max(1, self.display_pixmap.width()) if self.display_pixmap else self._canvas.width()
-        ch = max(1, self.display_pixmap.height()) if self.display_pixmap else self._canvas.height()
-        self._ocr_overlay.setGeometry(0, 0, cw, ch)
-        placed = self._ocr_overlay.build(result.lines, self._scale)
-        log.info("贴图原地 OCR:叠加 %d 行可选文字", placed)
+        if self._ocr_panel is None:
+            self._ocr_panel = OcrTextPanel(self)
+            # 面板内「收起/展开」按钮 → 重算窗口高度
+            self._ocr_panel.toggled.connect(self._refresh)
+        placed = self._ocr_panel.build(result.lines)
+        self._refresh()  # 在图下方展开面板,窗口随之加高
+        log.info("贴图原地 OCR:图下方展开 %d 行可选文字", placed)
 
     # ---- 交互事件(由 _PinCanvas 转发)----
     def on_press(self, event) -> None:
@@ -370,6 +433,22 @@ class PinWindow(QWidget):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self._canvas.setFocus()
+        self._play_entrance_flash()
+
+    def _play_entrance_flash(self) -> None:
+        """首次显示时播放一段主题色描边渐隐(约 0.6s),让用户看清「这块被钉住了」。"""
+        if self._flashed:
+            return
+        self._flashed = True
+        anim = QVariantAnimation(self)
+        anim.setStartValue(1.0)
+        anim.setEndValue(0.0)
+        anim.setDuration(600)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.valueChanged.connect(lambda v: self._canvas.set_flash(float(v)))
+        anim.finished.connect(lambda: self._canvas.set_flash(0.0))
+        anim.start()
+        self._flash_anim = anim  # 持引用防被 GC
 
     def closeEvent(self, event) -> None:
         # 断开原地 OCR 回调,避免后台线程稍后回调已销毁的窗口
