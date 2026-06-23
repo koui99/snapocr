@@ -11,9 +11,10 @@ env/
 build/
 dist/
 *.manifest
+*.spec
 
 # OCR 模型(体积大,单独下载/打包)
-models/*.onnx
+src/core/ocr/models/*.onnx
 
 # IDE / 编辑器
 .vscode/
@@ -27,3 +28,13 @@ Thumbs.db
 # 日志与运行时
 *.log
 logs/
+
+# 开发临时文件
+.ccg/
+design/BRIEF.md
+design/PLAN.md
+design/REDESIGN_BRIEF.md
+design/redesign/TASK_*.md
+design/redesign/*.sh
+design/redesign/deploy/
+design/redesign/*.jpg

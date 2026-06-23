@@ -1,7 +1,0 @@
-{"_example": "Fill with {\"file\": \"path\", \"reason\": \"why\"}. Seed rows are skipped."}
-{"file": "design/BRIEF.md", "reason": "UI 设计简报:视觉规范 + 4 组界面要求(含设置窗④的左侧导航与热键页)"}
-{"file": "design/PLAN.md", "reason": "开发计划:技术选型(PySide6+RapidOCR+PyInstaller)+ 里程碑 M1-M6 定义"}
-{"file": "design/mockup.html", "reason": "UI 原型:设置窗 + 托盘菜单的具体布局/菜单项/design token"}
-{"file": ".ccg/tasks/m1-skeleton/requirements.md", "reason": "M1 需求规格:范围/约束/验收(实施必须满足)"}
-{"file": ".ccg/tasks/m1-skeleton/analysis.md", "reason": "双模型分析综合:技术决策(热键/配置/单实例)+ 统一目录结构 + 环境约束"}
-{"file": ".ccg/tasks/m1-skeleton/plan.md", "reason": "详细实施计划:文件清单 + 分层依赖 + 测试策略 + 风险"}

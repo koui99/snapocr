@@ -1,1 +1,0 @@
-{"round": 1, "critical": 9, "warning": 6, "info": 5, "fixed_critical": 9, "fixed_warning": 6, "fixed_info": 4, "gates": {"security": "pass", "quality": "pass", "py_compile": "pass"}, "ts": "2026-06-19"}
