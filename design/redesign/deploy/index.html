@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnapOCR 风格 A - 浅色版</title>
+<style>
+:root {
+  --primary: #2D7FF9;
+  --primary-hover: #1B68DC;
+  --primary-active-bg: #EEF4FF;
+  --bg-main: #F5F6F8;
+  --bg-card: #FFFFFF;
+  --text-main: #333333;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --border: #E2E4E8;
+  --danger: #EF4444;
+  --danger-hover: #DC2626;
+  --success: #10B981;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 4px 16px rgba(0,0,0,.08);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.06);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
+  padding: 40px;
+  line-height: 1.6;
+}
+
+h1 {
+  text-align: center;
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 50px;
+  color: var(--text-main);
+}
+
+.section {
+  margin-bottom: 60px;
+  background: var(--bg-card);
+  padding: 30px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--primary);
+}
+
+/* ==================== ① 截图选区 + 标注工具栏 ==================== */
+.screenshot-container {
+  position: relative;
+  width: 100%;
+  height: 600px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: var(--radius-md);
+  overflow: visible;
+}
+
+.screenshot-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.screenshot-selection {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 640px;
+  height: 360px;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+}
+
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.resize-handle.nw { top: -5px; left: -5px; }
+.resize-handle.n { top: -5px; left: 50%; transform: translateX(-50%); }
+.resize-handle.ne { top: -5px; right: -5px; }
+.resize-handle.e { top: 50%; right: -5px; transform: translateY(-50%); }
+.resize-handle.se { bottom: -5px; right: -5px; }
+.resize-handle.s { bottom: -5px; left: 50%; transform: translateX(-50%); }
+.resize-handle.sw { bottom: -5px; left: -5px; }
+.resize-handle.w { top: 50%; left: -5px; transform: translateY(-50%); }
+
+.size-label {
+  position: absolute;
+  top: -32px;
+  left: 0;
+  background: var(--primary);
+  color: white;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar-group {
+  position: absolute;
+  right: -8px;
+  display: flex;
+  gap: 8px;
+  background: var(--bg-card);
+  padding: 6px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+}
+
+.toolbar-annotation {
+  bottom: 48px;
+}
+
+.toolbar-action {
+  bottom: -48px;
+}
+
+.tool-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.tool-btn:hover {
+  background: var(--bg-main);
+  color: var(--text-main);
+}
+
+.tool-btn.active {
+  background: var(--primary-active-bg);
+  color: var(--primary);
+}
+
+.tool-btn.primary {
+  background: var(--primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tool-btn.primary:hover {
+  background: var(--primary-hover);
+}
+
+.tool-btn.danger:hover {
+  background: #FEE2E2;
+  color: var(--danger);
+}
+
+.tool-btn.success:hover {
+  background: #D1FAE5;
+  color: var(--success);
+}
+
+.tool-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  margin: 0 4px;
+  align-self: center;
+}
+
+.property-bar {
+  position: absolute;
+  right: -8px;
+  bottom: -100px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--bg-card);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+}
+
+.property-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+
+.stroke-width {
+  display: flex;
+  gap: 4px;
+}
+
+.stroke-option {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.stroke-option:hover {
+  border-color: var(--primary);
+}
+
+.stroke-option.active {
+  border-color: var(--primary);
+  background: var(--primary-active-bg);
+}
+
+.stroke-line {
+  width: 20px;
+  height: 2px;
+  background: var(--text-main);
+}
+
+.stroke-option:nth-child(2) .stroke-line { height: 3px; }
+.stroke-option:nth-child(3) .stroke-line { height: 4px; }
+
+.color-palette {
+  display: flex;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.color-swatch.active {
+  border-color: var(--text-main);
+}
+
+.color-swatch.active::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+
+.magnifier {
+  position: absolute;
+  left: 100px;
+  top: 100px;
+  width: 160px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.magnifier-grid {
+  width: 160px;
+  height: 160px;
+  background:
+    repeating-linear-gradient(0deg, var(--border) 0px, var(--border) 1px, transparent 1px, transparent 16px),
+    repeating-linear-gradient(90deg, var(--border) 0px, var(--border) 1px, transparent 1px, transparent 16px);
+  position: relative;
+}
+
+.magnifier-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+  opacity: 0.3;
+}
+
+.magnifier-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--primary);
+  background: rgba(45, 127, 249, 0.2);
+  z-index: 1;
+}
+
+.magnifier-info {
+  padding: 8px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-main);
+}
+
+.magnifier-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.magnifier-color-preview {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: #4A90E2;
+}
+
+/* ==================== ② 贴图浮窗 + 右键菜单 ==================== */
+.pin-container {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+}
+
+.pin-window {
+  position: relative;
+  width: 360px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 3px solid transparent;
+  background: var(--bg-card);
+  background-clip: padding-box;
+}
+
+.pin-window::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  z-index: -1;
+}
+
+.pin-image {
+  width: 100%;
+  height: 240px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+
+.pin-scale-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.context-menu {
+  width: 220px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  color: var(--text-main);
+  position: relative;
+}
+
+.menu-item:hover {
+  background: var(--bg-main);
+}
+
+.menu-item.checked::after {
+  content: '✓';
+  position: absolute;
+  right: 12px;
+  color: var(--primary);
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.menu-item.danger {
+  color: var(--danger);
+}
+
+.menu-item.danger:hover {
+  background: #FEE2E2;
+}
+
+.menu-item .icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.menu-submenu::after {
+  content: '▸';
+  position: absolute;
+  right: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+
+/* ==================== ③ OCR 原地文字面板 ==================== */
+.ocr-inline-container {
+  display: flex;
+  gap: 60px;
+  align-items: flex-start;
+}
+
+.ocr-inline-group {
+  flex: 1;
+}
+
+.ocr-inline-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.pin-with-text {
+  position: relative;
+  width: 360px;
+}
+
+.pin-image-small {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.ocr-text-panel {
+  margin-top: 8px;
+  background: #2C3E50;
+  color: #ECF0F1;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+}
+
+.ocr-text-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ocr-collapse-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ocr-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ocr-text-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ocr-text-content {
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  user-select: text;
+  color: #ECF0F1;
+}
+
+.ocr-collapsed {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.ocr-show-btn {
+  background: #2C3E50;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s;
+}
+
+.ocr-show-btn:hover {
+  background: #34495E;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+/* ==================== ④ OCR 结果窗 ==================== */
+.ocr-result-window {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  max-width: 900px;
+}
+
+.window-header {
+  background: var(--bg-main);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.window-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.window-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.window-close:hover {
+  background: #FEE2E2;
+  color: var(--danger);
+}
+
+.ocr-toolbar {
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.ocr-select {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ocr-select:hover {
+  border-color: var(--primary);
+}
+
+.ocr-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ocr-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.ocr-content {
+  display: flex;
+  height: 400px;
+}
+
+.ocr-preview {
+  width: 300px;
+  background: var(--bg-main);
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.ocr-preview-img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  width: 200px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+}
+
+.ocr-text {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.ocr-textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  resize: none;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-main);
+  outline: none;
+}
+
+.ocr-footer {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  background: var(--bg-main);
+}
+
+.ocr-status {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ocr-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+/* ==================== ⑤ 设置窗 + 托盘菜单 ==================== */
+.settings-window {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+}
+
+.settings-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.settings-nav {
+  width: 180px;
+  background: var(--bg-main);
+  border-right: 1px solid var(--border);
+  padding: 16px 8px;
+}
+
+.nav-item {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.nav-item:hover {
+  background: rgba(45, 127, 249, 0.08);
+}
+
+.nav-item.active {
+  background: var(--primary-active-bg);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.settings-panel {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 20px;
+}
+
+.settings-group {
+  margin-bottom: 20px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-label {
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.hotkey-input {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 13px;
+  min-width: 120px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hotkey-input:hover {
+  border-color: var(--primary);
+}
+
+.hotkey-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-active-bg);
+}
+
+.settings-footer {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  background: var(--bg-main);
+}
+
+.tray-menu {
+  width: 240px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+}
+
+.tray-menu .menu-item {
+  padding: 10px 14px;
+}
+
+/* ==================== 托盘图标 ==================== */
+.tray-icons {
+  display: flex;
+  gap: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  background: var(--bg-main);
+  border-radius: var(--radius-md);
+}
+
+.tray-icon-group {
+  text-align: center;
+}
+
+.tray-icon-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.tray-icon-preview {
+  background: var(--bg-card);
+  padding: 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: inline-block;
+}
+
+/* ==================== Design Token 表格 ==================== */
+.token-section {
+  margin-top: 60px;
+  padding-top: 40px;
+  border-top: 3px solid var(--primary);
+}
+
+.token-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.token-table th {
+  background: var(--primary);
+  color: white;
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.token-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.token-table tr:last-child td {
+  border-bottom: none;
+}
+
+.token-table tr:hover {
+  background: var(--bg-main);
+}
+
+.token-name {
+  font-family: "Consolas", "Monaco", monospace;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.token-value {
+  font-family: "Consolas", "Monaco", monospace;
+  color: var(--text-main);
+}
+
+.token-preview {
+  width: 40px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: inline-block;
+}
+</style>
+</head>
+<body>
+
+<h1>SnapOCR 风格 A - 浅色版</h1>
+
+<!-- ① 截图选区 + 标注工具栏 -->
+<div class="section">
+  <div class="section-title">① 截图选区 + 标注工具栏</div>
+  <div class="screenshot-container">
+    <div class="screenshot-overlay"></div>
+    <div class="screenshot-selection">
+      <div class="size-label">1280 × 720</div>
+
+      <!-- 8个调整控制点 -->
+      <div class="resize-handle nw"></div>
+      <div class="resize-handle n"></div>
+      <div class="resize-handle ne"></div>
+      <div class="resize-handle e"></div>
+      <div class="resize-handle se"></div>
+      <div class="resize-handle s"></div>
+      <div class="resize-handle sw"></div>
+      <div class="resize-handle w"></div>
+
+      <!-- 标注工具栏 -->
+      <div class="toolbar-group toolbar-annotation">
+        <button class="tool-btn active" title="矩形">□</button>
+        <button class="tool-btn" title="椭圆">○</button>
+        <button class="tool-btn" title="直线">—</button>
+        <button class="tool-btn" title="箭头">→</button>
+        <button class="tool-btn" title="画笔">✏</button>
+        <button class="tool-btn" title="马克笔">🖍</button>
+        <button class="tool-btn" title="马赛克">▦</button>
+        <button class="tool-btn" title="文字">A</button>
+        <button class="tool-btn" title="序号">①</button>
+        <button class="tool-btn" title="橡皮擦">⌫</button>
+      </div>
+
+      <!-- 操作工具栏 -->
+      <div class="toolbar-group toolbar-action">
+        <button class="tool-btn" title="撤销">↶</button>
+        <button class="tool-btn" title="重做">↷</button>
+        <div class="tool-divider"></div>
+        <button class="tool-btn" title="取色">🎨</button>
+        <div class="tool-divider"></div>
+        <button class="tool-btn" title="钉图">📌</button>
+        <button class="tool-btn" title="复制">📋</button>
+        <button class="tool-btn" title="保存">💾</button>
+        <button class="tool-btn primary" title="识别">OCR</button>
+        <button class="tool-btn danger" title="取消">✕</button>
+        <button class="tool-btn success" title="确认">✓</button>
+      </div>
+
+      <!-- 属性栏 -->
+      <div class="property-bar">
+        <span class="property-label">粗细</span>
+        <div class="stroke-width">
+          <div class="stroke-option active">
+            <div class="stroke-line"></div>
+          </div>
+          <div class="stroke-option">
+            <div class="stroke-line"></div>
+          </div>
+          <div class="stroke-option">
+            <div class="stroke-line"></div>
+          </div>
+        </div>
+
+        <div class="color-palette">
+          <div class="color-swatch active" style="background:#EF4444;" title="红色"></div>
+          <div class="color-swatch" style="background:#F59E0B;" title="橙色"></div>
+          <div class="color-swatch" style="background:#10B981;" title="绿色"></div>
+          <div class="color-swatch" style="background:#3B82F6;" title="蓝色"></div>
+          <div class="color-swatch" style="background:#8B5CF6;" title="紫色"></div>
+          <div class="color-swatch" style="background:#1F2937;" title="黑色"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 取色放大镜 -->
+    <div class="magnifier">
+      <div class="magnifier-grid">
+        <div class="magnifier-center"></div>
+      </div>
+      <div class="magnifier-info">
+        <span>640, 360</span>
+        <div class="magnifier-color">
+          <div class="magnifier-color-preview"></div>
+          <span>#4A90E2</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ② 贴图浮窗 + 右键菜单 -->
+<div class="section">
+  <div class="section-title">② 贴图浮窗 + 右键菜单</div>
+  <div class="pin-container">
+    <div class="pin-window">
+      <div class="pin-scale-badge">100%</div>
+      <div class="pin-image">贴图内容预览</div>
+    </div>
+
+    <div class="context-menu">
+      <div class="menu-item">
+        <span class="icon">📋</span>
+        <span>复制</span>
+      </div>
+      <div class="menu-item">
+        <span class="icon">💾</span>
+        <span>保存图片</span>
+      </div>
+      <div class="menu-item">
+        <span class="icon">🔍</span>
+        <span>文字识别</span>
+      </div>
+      <div class="menu-divider"></div>
+      <div class="menu-item menu-submenu">
+        <span class="icon">🔍</span>
+        <span>缩放</span>
+      </div>
+      <div class="menu-item menu-submenu">
+        <span class="icon">◐</span>
+        <span>不透明度</span>
+      </div>
+      <div class="menu-item">
+        <span class="icon">🔄</span>
+        <span>旋转</span>
+      </div>
+      <div class="menu-divider"></div>
+      <div class="menu-item checked">
+        <span class="icon">📌</span>
+        <span>置顶</span>
+      </div>
+      <div class="menu-item">
+        <span class="icon">📍</span>
+        <span>取消贴图</span>
+      </div>
+      <div class="menu-item danger">
+        <span class="icon">🗑</span>
+        <span>销毁</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ③ OCR 原地文字面板 -->
+<div class="section">
+  <div class="section-title">③ OCR 原地文字面板（展开态 + 收起态）</div>
+  <div class="ocr-inline-container">
+    <!-- 展开态 -->
+    <div class="ocr-inline-group">
+      <div class="ocr-inline-label">展开态</div>
+      <div class="pin-with-text">
+        <div class="pin-image-small">贴图示例（浅色底）</div>
+        <div class="ocr-text-panel">
+          <div class="ocr-text-header">
+            <button class="ocr-collapse-btn">收起</button>
+            <div class="ocr-text-hint">Ctrl+A 全选 · Ctrl+C 复制</div>
+          </div>
+          <div class="ocr-text-content">这是识别出的文字内容
+可以直接选中复制
+保持原始版式排版
+支持多行文本展示</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 收起态 -->
+    <div class="ocr-inline-group">
+      <div class="ocr-inline-label">收起态</div>
+      <div class="pin-with-text">
+        <div class="pin-image-small">贴图示例（浅色底）</div>
+        <div class="ocr-collapsed">
+          <button class="ocr-show-btn">显示文字</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ④ OCR 结果窗 -->
+<div class="section">
+  <div class="section-title">④ OCR 结果窗（独立窗口）</div>
+  <div class="ocr-result-window">
+    <div class="window-header">
+      <div class="window-title">文字识别结果</div>
+      <button class="window-close">✕</button>
+    </div>
+
+    <div class="ocr-toolbar">
+      <select class="ocr-select">
+        <option>中英混合</option>
+        <option>仅英文</option>
+        <option>日语</option>
+      </select>
+      <button class="ocr-btn">重新识别</button>
+    </div>
+
+    <div class="ocr-content">
+      <div class="ocr-preview">
+        <div class="ocr-preview-img">原图缩略图</div>
+      </div>
+      <div class="ocr-text">
+        <textarea class="ocr-textarea" placeholder="识别结果将显示在这里...">这是一段识别出来的文字内容示例。
+可以直接编辑和复制。
+
+支持多行文本显示，
+保持原有的段落格式。</textarea>
+      </div>
+    </div>
+
+    <div class="ocr-footer">
+      <div class="ocr-status">识别耗时 0.8s · 置信度 96%</div>
+      <div class="ocr-actions">
+        <button class="btn btn-secondary">复制全部</button>
+        <button class="btn btn-secondary">保存txt</button>
+        <button class="btn btn-primary">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑤ 设置窗 + 托盘菜单 -->
+<div class="section">
+  <div class="section-title">⑤ 设置窗 + 托盘菜单</div>
+  <div style="display:flex; gap:40px; align-items:flex-start;">
+    <!-- 设置窗口 -->
+    <div class="settings-window">
+      <div class="window-header">
+        <div class="window-title">设置</div>
+        <button class="window-close">✕</button>
+      </div>
+
+      <div class="settings-content">
+        <div class="settings-nav">
+          <div class="nav-item">常规</div>
+          <div class="nav-item active">热键</div>
+          <div class="nav-item">截屏</div>
+          <div class="nav-item">贴图</div>
+          <div class="nav-item">输出</div>
+          <div class="nav-item">文字识别</div>
+          <div class="nav-item">关于</div>
+        </div>
+
+        <div class="settings-panel">
+          <div class="panel-title">热键设置</div>
+          <div class="settings-group">
+            <div class="setting-row">
+              <div class="setting-label">截屏</div>
+              <input type="text" class="hotkey-input" value="F1" readonly>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">贴图</div>
+              <input type="text" class="hotkey-input" value="F3" readonly>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">隐藏/显示贴图</div>
+              <input type="text" class="hotkey-input" value="Shift + F3" readonly>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label">文字识别</div>
+              <input type="text" class="hotkey-input" value="F4" readonly>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="btn btn-secondary">恢复默认</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary">取消</button>
+          <button class="btn btn-primary">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 托盘菜单 -->
+    <div class="tray-menu">
+      <div class="menu-item">
+        <span class="icon">✂</span>
+        <span>截屏</span>
+      </div>
+      <div class="menu-item">
+        <span class="icon">📌</span>
+        <span>贴图</span>
+      </div>
+      <div class="menu-item">
+        <span class="icon">🔍</span>
+        <span>文字识别</span>
+      </div>
+      <div class="menu-item menu-submenu">
+        <span class="icon">📁</span>
+        <span>最近文件</span>
+      </div>
+      <div class="menu-divider"></div>
+      <div class="menu-item">
+        <span class="icon">⚙</span>
+        <span>设置</span>
+      </div>
+      <div class="menu-item checked">
+        <span class="icon">🚀</span>
+        <span>开机启动</span>
+      </div>
+      <div class="menu-divider"></div>
+      <div class="menu-item">
+        <span class="icon">❓</span>
+        <span>帮助</span>
+      </div>
+      <div class="menu-item">
+        <span class="icon">ℹ</span>
+        <span>关于</span>
+      </div>
+      <div class="menu-divider"></div>
+      <div class="menu-item danger">
+        <span class="icon">🚪</span>
+        <span>退出</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 托盘图标方案 -->
+<div class="section">
+  <div class="section-title">托盘图标方案</div>
+  <div class="tray-icons">
+    <div class="tray-icon-group">
+      <div class="tray-icon-label">48 × 48 (高清预览)</div>
+      <div class="tray-icon-preview">
+        <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="6" width="36" height="36" rx="8" fill="#2D7FF9"/>
+          <rect x="12" y="12" width="24" height="16" rx="2" fill="white" opacity="0.9"/>
+          <path d="M14 32 L22 32 M26 32 L34 32" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+          <circle cx="30" cy="20" r="3" fill="#2D7FF9"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="tray-icon-group">
+      <div class="tray-icon-label">16 × 16 (实际尺寸)</div>
+      <div class="tray-icon-preview">
+        <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="14" height="14" rx="3" fill="#2D7FF9"/>
+          <rect x="3" y="3" width="10" height="6" rx="1" fill="white" opacity="0.9"/>
+          <line x1="3" y1="11" x2="13" y2="11" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.9"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Design Token 表格 -->
+<div class="token-section">
+  <div class="token-title">Design Token - 风格 A 浅色版</div>
+  <table class="token-table">
+    <thead>
+      <tr>
+        <th>Token 名称</th>
+        <th>值</th>
+        <th>预览</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="token-name">primary</td>
+        <td class="token-value">#2D7FF9</td>
+        <td><span class="token-preview" style="background:#2D7FF9;"></span></td>
+        <td>主色（选中/强调/主按钮）</td>
+      </tr>
+      <tr>
+        <td class="token-name">primary_hover</td>
+        <td class="token-value">#1B68DC</td>
+        <td><span class="token-preview" style="background:#1B68DC;"></span></td>
+        <td>主色悬停</td>
+      </tr>
+      <tr>
+        <td class="token-name">primary_active_bg</td>
+        <td class="token-value">#EEF4FF</td>
+        <td><span class="token-preview" style="background:#EEF4FF;"></span></td>
+        <td>主色浅底（导航选中底、按钮按下底）</td>
+      </tr>
+      <tr>
+        <td class="token-name">bg_main</td>
+        <td class="token-value">#F5F6F8</td>
+        <td><span class="token-preview" style="background:#F5F6F8;"></span></td>
+        <td>窗口主背景（略深）</td>
+      </tr>
+      <tr>
+        <td class="token-name">bg_card</td>
+        <td class="token-value">#FFFFFF</td>
+        <td><span class="token-preview" style="background:#FFFFFF;"></span></td>
+        <td>卡片/内容区背景</td>
+      </tr>
+      <tr>
+        <td class="token-name">text_main</td>
+        <td class="token-value">#333333</td>
+        <td><span class="token-preview" style="background:#333333;"></span></td>
+        <td>主文字</td>
+      </tr>
+      <tr>
+        <td class="token-name">text_secondary</td>
+        <td class="token-value">#666666</td>
+        <td><span class="token-preview" style="background:#666666;"></span></td>
+        <td>次要文字</td>
+      </tr>
+      <tr>
+        <td class="token-name">text_muted</td>
+        <td class="token-value">#999999</td>
+        <td><span class="token-preview" style="background:#999999;"></span></td>
+        <td>弱化文字/提示</td>
+      </tr>
+      <tr>
+        <td class="token-name">border</td>
+        <td class="token-value">#E2E4E8</td>
+        <td><span class="token-preview" style="background:#E2E4E8;"></span></td>
+        <td>分隔线/边框</td>
+      </tr>
+      <tr>
+        <td class="token-name">danger</td>
+        <td class="token-value">#EF4444</td>
+        <td><span class="token-preview" style="background:#EF4444;"></span></td>
+        <td>危险色（关闭悬停、删除）</td>
+      </tr>
+      <tr>
+        <td class="token-name">success</td>
+        <td class="token-value">#10B981</td>
+        <td><span class="token-preview" style="background:#10B981;"></span></td>
+        <td>成功色</td>
+      </tr>
+      <tr>
+        <td class="token-name">radius_sm</td>
+        <td class="token-value">6px</td>
+        <td><span class="token-preview" style="background:#2D7FF9; border-radius:6px;"></span></td>
+        <td>小圆角（按钮/控件）</td>
+      </tr>
+      <tr>
+        <td class="token-name">radius_md</td>
+        <td class="token-value">8px</td>
+        <td><span class="token-preview" style="background:#2D7FF9; border-radius:8px;"></span></td>
+        <td>中圆角（卡片）</td>
+      </tr>
+      <tr>
+        <td class="token-name">radius_lg</td>
+        <td class="token-value">12px</td>
+        <td><span class="token-preview" style="background:#2D7FF9; border-radius:12px;"></span></td>
+        <td>大圆角（窗口）</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>
+
