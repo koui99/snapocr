@@ -1,34 +1,58 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
+from pathlib import Path
 
 block_cipher = None
 
-# 收集 OCR 模型和字典文件
-ocr_datas = [
-    ('src/core/ocr/models/*.onnx', 'src/core/ocr/models'),
-    ('src/core/ocr/models/*.txt', 'src/core/ocr/models'),
+# 当前目录
+base_path = Path('.')
+
+# 手动指定所有数据文件
+datas = [
+    # OCR 模型（最重要）
+    ('src/core/ocr/models', 'src/core/ocr/models'),
+    # 主题文件
+    ('src/ui/theme', 'src/ui/theme'),
 ]
 
-# 收集主题文件
-theme_datas = [
-    ('src/ui/theme/*.qss', 'src/ui/theme'),
+# 收集 RapidOCR 的配置文件
+from PyInstaller.utils.hooks import collect_data_files
+datas += collect_data_files('rapidocr_onnxruntime')
+
+# 所有需要的隐藏导入
+hiddenimports = [
+    # PySide6 核心
+    'PySide6.QtCore',
+    'PySide6.QtGui',
+    'PySide6.QtWidgets',
+    'PySide6.QtNetwork',
+    'PySide6.QtSvg',
+    'shiboken6',
+    # OCR 相关
+    'rapidocr_onnxruntime',
+    'rapidocr_onnxruntime.api',
+    'onnxruntime',
+    'onnxruntime.capi',
+    'onnxruntime.capi.onnxruntime_pybind11_state',
+    # 图像处理
+    'cv2',
+    'numpy',
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'PIL.ImageFilter',
+    # 其他
+    'shapely',
+    'shapely.geometry',
 ]
 
 a = Analysis(
     ['run.py'],
     pathex=[],
     binaries=[],
-    datas=ocr_datas + theme_datas,
-    hiddenimports=[
-        'PySide6.QtCore',
-        'PySide6.QtGui',
-        'PySide6.QtWidgets',
-        'rapidocr_onnxruntime',
-        'onnxruntime',
-        'cv2',
-        'numpy',
-        'PIL',
-        'shapely',
-    ],
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -51,7 +75,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,  # 无控制台窗口
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
