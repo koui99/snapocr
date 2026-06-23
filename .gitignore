@@ -11,7 +11,8 @@ env/
 build/
 dist/
 *.manifest
-*.spec
+# 保留主 spec 配置文件，排除自动生成的临时 spec
+# *.spec
 
 # OCR 模型(体积大,单独下载/打包)
 src/core/ocr/models/*.onnx
