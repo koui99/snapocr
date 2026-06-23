@@ -69,13 +69,13 @@ exe = EXE(
     pyz,
     a.scripts,
     [],
-    exclude_binaries=True,
+    exclude_binaries=True,  # onedir 模式：不把二进制文件打包到 exe 里
     name='SnapOCR',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=False,  # 改为 True 可以看到错误信息
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
