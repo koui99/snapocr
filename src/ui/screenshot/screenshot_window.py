@@ -219,12 +219,18 @@ class ScreenshotWindow(QWidget):
         # —— 选区模式 ——
         target = self.tracker.hit_test(pos)
         log.debug(f"鼠标按下 pos={pos}, target={target}, state={self.tracker.state}")
-        if self.tracker.state == SelectionState.IDLE or target == "outside":
+
+        # 修复逻辑：优先判断 target，而非 state
+        if target == "outside":
+            # 点击选区外 → 重新创建选区
             self.tracker.start_creation(pos)
         elif target == "inside":
+            # 点击选区内 → 移动选区
             self.tracker.start_move(pos)
         else:
+            # 点击控制点 → 调整大小
             self.tracker.start_resize(pos, target)
+
         self.last_mouse_pos = pos
         self.update()
 
