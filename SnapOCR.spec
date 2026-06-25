@@ -9,13 +9,17 @@ base_path = Path('.')
 
 # 手动指定所有数据文件
 datas = [
-    # OCR 模型（最重要）:
-    # engine.py 在 PyInstaller 环境下从 sys._MEIPASS/models 查找模型,
-    # 因此这里必须收集到顶层 models/ 目录,避免打包后日语模型找不到而降级。
-    ('src/core/ocr/models', 'models'),
-    # 主题文件
-    ('src/ui/theme', 'src/ui/theme'),
+    # 运行时只需要 QSS 模板;theme_manager/tokens 作为 Python 模块会进 PYZ,
+    # 不需要把整个目录(含 __pycache__)再作为 data 打包一份。
+    ('src/ui/theme/theme.qss', 'src/ui/theme'),
 ]
+
+# OCR 可选模型:
+# RapidOCR 自带中英混合默认模型;项目内 models/ 只放可选扩展模型。
+# 日语模型已移除以减小安装包体积,因此这里仅在目录内确有文件时才收集。
+_model_dir = base_path / 'src/core/ocr/models'
+if _model_dir.exists() and any(path.is_file() for path in _model_dir.rglob('*')):
+    datas.append((str(_model_dir), 'models'))
 
 # 应用图标资源（运行时窗口/托盘图标）:
 # exe 文件图标由 EXE(icon=...) 写入 PE 资源;运行时 Qt 托盘/窗口图标从
@@ -45,17 +49,29 @@ hiddenimports = [
     'onnxruntime',
     'onnxruntime.capi',
     'onnxruntime.capi.onnxruntime_pybind11_state',
-    # 图像处理
+    # OCR 图像处理依赖(由 rapidocr 间接使用,保留核心项)
     'cv2',
     'numpy',
     'PIL',
     'PIL.Image',
-    'PIL.ImageDraw',
-    'PIL.ImageFont',
-    'PIL.ImageFilter',
-    # 其他
-    'shapely',
-    'shapely.geometry',
+]
+
+# 排除常见“可选但很重”的生态包,避免依赖链中的 optional import 被误收集。
+# 不排除 cv2/numpy/PIL/onnxruntime/rapidocr/PySide6 核心模块,保证现有功能不变。
+excludes = [
+    'IPython',
+    'jupyter',
+    'matplotlib',
+    'notebook',
+    'pandas',
+    'pytest',
+    'scipy',
+    'sklearn',
+    'tensorflow',
+    'tkinter',
+    'torch',
+    'PyQt5',
+    'PyQt6',
 ]
 
 a = Analysis(
@@ -67,7 +83,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

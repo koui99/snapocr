@@ -17,6 +17,7 @@ from src.config import paths
 from src.ui.theme import tokens
 
 _ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
+_APP_ICON: QIcon | None = None
 
 
 def _load_runtime_png_icon() -> QIcon | None:
@@ -43,15 +44,21 @@ def make_app_icon(size: int = 64) -> QIcon:
     带 PNG,再回退 src/assets/app_icon.ico;若资源缺失,最后绘制一个「渐变
     圆角底 + 截图扫描框 + OCR 文本线」的兜底图标。
     """
+    global _APP_ICON
+    if _APP_ICON is not None:
+        return _APP_ICON
+
     runtime_icon = _load_runtime_png_icon()
     if runtime_icon is not None:
-        return runtime_icon
+        _APP_ICON = runtime_icon
+        return _APP_ICON
 
     icon_path = paths.resource_path("src/assets/app_icon.ico")
     if icon_path.exists():
         icon = QIcon(str(icon_path))
         if not icon.isNull():
-            return icon
+            _APP_ICON = icon
+            return _APP_ICON
 
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.GlobalColor.transparent)
@@ -94,4 +101,5 @@ def make_app_icon(size: int = 64) -> QIcon:
     painter.drawRoundedRect(int(size * 0.27), int(size * 0.48), int(size * 0.46), beam_h, beam_h / 2, beam_h / 2)
     painter.end()
 
-    return QIcon(pixmap)
+    _APP_ICON = QIcon(pixmap)
+    return _APP_ICON

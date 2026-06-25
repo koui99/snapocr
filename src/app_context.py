@@ -244,9 +244,18 @@ class AppContext(QObject):
             self._settings_dialog = SettingsDialog(copy.deepcopy(self.config.data))
             self._settings_dialog.sig_saved.connect(self._on_settings_saved)
             self._settings_dialog.sig_reset_defaults.connect(self._on_reset_defaults)
+            self._settings_dialog.finished.connect(self._on_settings_closed)
         if page_index is not None:
             self._settings_dialog.select_page(page_index)
         self._settings_dialog.show_and_raise()
+
+    def _on_settings_closed(self, _result: int = 0) -> None:
+        """设置窗关闭后丢弃实例。
+
+        QDialog 默认只是隐藏;若复用同一个对象,用户「取消」前修改过的控件值会在下次
+        打开时残留。每次从当前配置重建,可保证取消不污染下一次设置体验。
+        """
+        self._settings_dialog = None
 
     def _on_settings_saved(self, merged: dict) -> None:
         for section, payload in merged.items():

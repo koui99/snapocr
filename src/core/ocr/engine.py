@@ -19,16 +19,14 @@ from src.core.logger import get_logger
 log = get_logger("ocr.engine")
 
 # 语言选项:value → 中文标签。模型挂载见 _get_engine。
-# mix=内置中英混合;en/ja 需把对应模型(+日语还需字典)放到本包 models/ 目录才真正生效,
-# 缺文件则自动降级为内置中英混合(不假装支持)。
+# mix=内置中英混合;en 若提供独立英文模型则切换,否则降级为内置中英混合。
+# 日语 OCR 已移除,以减少安装包体积。
 LANG_OPTIONS = [
     ("mix", "中英混合(内置)"),
     ("en", "仅英文"),
-    ("ja", "日语"),
 ]
 _EN_REC_MODEL = "en_PP-OCRv3_rec_infer.onnx"     # 存在则「仅英文」真正切换,否则降级混合
-_JA_REC_MODEL = "japan_PP-OCRv4_rec_mobile.onnx"  # 日语识别模型(onnx,PP-OCRv4 mobile)
-_JA_REC_KEYS = "japan_dict.txt"                   # 日语字符字典(必须与模型配套,否则乱码)
+_LANG_VALUES = {value for value, _label in LANG_OPTIONS}
 
 
 @dataclass
@@ -83,6 +81,11 @@ def lang_label(value: str) -> str:
     return LANG_OPTIONS[0][1]
 
 
+def _normalize_lang(value: str | None) -> str:
+    """规范化语言值;兼容旧配置里的 ja 等已移除选项。"""
+    return value if value in _LANG_VALUES else "mix"
+
+
 def _resource_base() -> str:
     """模型资源根目录:PyInstaller onefile 用 sys._MEIPASS,否则用本包目录。"""
     return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -132,6 +135,7 @@ class OcrEngine:
     @classmethod
     def _get_engine(cls, lang: str):
         """按语言取(或创建)RapidOCR 实例。缺 rapidocr / 模型 → 抛出,由 recognize 兜中文错。"""
+        lang = _normalize_lang(lang)
         with cls._lock:
             if lang in cls._engines:
                 return cls._engines[lang]
@@ -145,16 +149,6 @@ class OcrEngine:
                     kwargs["rec_model_path"] = en_model
                 else:
                     log.info("未找到纯英文模型,降级为内置中英混合模型")
-            elif lang == "ja":
-                # 日语需「识别模型 + 配套字典」两者齐全才生效,缺任一则降级内置混合
-                ja_model = _bundled_model(_JA_REC_MODEL)
-                ja_keys = _bundled_model(_JA_REC_KEYS)
-                if ja_model and ja_keys:
-                    kwargs["rec_model_path"] = ja_model
-                    kwargs["rec_keys_path"] = ja_keys
-                else:
-                    log.info("未找到日语模型或字典(需 %s + %s),降级为内置中英混合模型",
-                             _JA_REC_MODEL, _JA_REC_KEYS)
             engine = RapidOCR(**kwargs)
             cls._engines[lang] = engine
             log.info("RapidOCR 引擎已初始化(lang=%s)", lang)
@@ -165,6 +159,7 @@ class OcrEngine:
         """识别图片字节(PNG/JPEG)。任何异常都转成 ok=False + 中文说明,不抛。"""
         if not image_bytes:
             return OcrResult(ok=False, error="没有可识别的图片内容")
+        lang = _normalize_lang(lang)
 
         try:
             engine = cls._get_engine(lang)
