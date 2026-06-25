@@ -96,27 +96,56 @@ class ScreenshotWriter:
 
     @staticmethod
     def save_to_file(image: QImage, config) -> str | None:
-        """按 config.screenshot 配置写盘;返回绝对路径,失败返回 None。"""
+        """弹出文件保存对话框,让用户选择保存位置;返回绝对路径,失败/取消返回 None。"""
         if image is None or image.isNull():
             return None
 
+        from PySide6.QtWidgets import QFileDialog
+
+        # 默认保存目录和格式
         save_dir = config.get("screenshot", "save_dir", "") or ""
         fmt = (config.get("screenshot", "format", "png") or "png").lower()
         quality = int(config.get("screenshot", "quality", 90) or 90)
 
         if not save_dir:
-            # 未配置则落到用户数据目录下的 screenshots/
+            # 未配置则使用用户数据目录下的 screenshots/
             save_dir = str(paths.data_dir() / "screenshots")
 
         try:
             os.makedirs(save_dir, exist_ok=True)
-            filename = f"Screenshot_{int(time.time())}.{fmt}"
-            fullpath = os.path.join(save_dir, filename)
+        except Exception:
+            save_dir = str(paths.data_dir())  # 回退到数据根目录
+
+        # 默认文件名
+        default_filename = f"Screenshot_{int(time.time())}.{fmt}"
+        default_path = os.path.join(save_dir, default_filename)
+
+        # 弹出保存对话框
+        file_path, selected_filter = QFileDialog.getSaveFileName(
+            None,  # parent
+            "保存截图",  # caption
+            default_path,  # default path
+            "PNG 图片 (*.png);;JPEG 图片 (*.jpg *.jpeg);;所有文件 (*.*)",  # filter
+            options=QFileDialog.Option.DontUseNativeDialog  # 使用 Qt 对话框,跨平台统一
+        )
+
+        # 用户取消
+        if not file_path:
+            log.info("用户取消保存")
+            return None
+
+        try:
             # JPG 无 alpha,统一转 RGB32 再写,避免黑底
             out = image.convertToFormat(QImage.Format.Format_RGB32)
-            if out.save(fullpath, fmt.upper(), quality):
-                log.info("截图已保存:%s", fullpath)
-                return fullpath
+            # 从文件扩展名判断格式
+            ext = os.path.splitext(file_path)[1].lower()
+            save_format = "JPEG" if ext in (".jpg", ".jpeg") else "PNG"
+
+            if out.save(file_path, save_format, quality):
+                log.info("截图已保存:%s", file_path)
+                # 记住用户选择的目录,下次默认使用
+                config.set("screenshot", "save_dir", os.path.dirname(file_path))
+                return file_path
             log.error("截图保存失败,QImage.save 返回 False")
         except Exception as e:
             log.error("截图保存异常:%s", e)

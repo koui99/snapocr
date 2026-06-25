@@ -68,7 +68,7 @@ class ScreenshotWindow(QWidget):
         self.bg_image = self.bg_pixmap.toImage()
 
         # 选区 / 放大镜
-        self.tracker = SelectionTracker(handle_size=6, hit_threshold=8)
+        self.tracker = SelectionTracker(handle_size=10, hit_threshold=16)
         self.magnifier = MagnifierRenderer(size=135, zoom_factor=9, border_color=COLORS["primary"])
         self.last_mouse_pos = QPoint()
         self.show_magnifier = True
@@ -180,8 +180,8 @@ class ScreenshotWindow(QWidget):
 
         if handles:
             hs = self.tracker.handle_size
-            painter.setPen(QPen(QColor(COLORS["primary"]), 1.5))
-            painter.setBrush(QColor(COLORS["bg_card"]))
+            painter.setPen(QPen(QColor(COLORS["primary"]), 2))
+            painter.setBrush(QColor("#FFFFFF"))  # 白色填充更醒目
             for _name, center in self.tracker.get_handles().items():
                 painter.drawRect(QRect(center.x() - hs // 2, center.y() - hs // 2, hs, hs))
         painter.restore()
