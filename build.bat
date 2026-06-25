@@ -5,13 +5,24 @@ echo   SnapOCR 打包脚本
 echo ====================================
 echo.
 
-echo [1/3] 清理旧的构建文件...
+echo [1/4] 清理旧的构建文件...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 echo 清理完成
 echo.
 
-echo [2/3] 开始打包 (这可能需要几分钟)...
+echo [2/3] 生成应用图标资源...
+python tools\generate_app_icon.py
+if errorlevel 1 (
+    echo.
+    echo 图标生成失败！请检查错误信息。
+    pause
+    exit /b 1
+)
+echo 图标资源已同步
+echo.
+
+echo [3/4] 开始打包 (这可能需要几分钟)...
 pyinstaller SnapOCR.spec
 if errorlevel 1 (
     echo.
@@ -22,7 +33,7 @@ if errorlevel 1 (
 echo 打包完成
 echo.
 
-echo [3/3] 生成便携模式标记文件...
+echo [4/4] 生成便携模式标记文件...
 echo. > dist\SnapOCR\portable.flag
 echo 便携模式已启用
 echo.

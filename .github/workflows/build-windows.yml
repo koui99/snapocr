@@ -26,6 +26,7 @@ jobs:
 
     - name: 构建 EXE
       run: |
+        python tools/generate_app_icon.py
         pyinstaller SnapOCR.spec
         echo . > dist/SnapOCR/portable.flag
 

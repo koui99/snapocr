@@ -15,9 +15,15 @@ datas = [
     ('src/core/ocr/models', 'models'),
     # 主题文件
     ('src/ui/theme', 'src/ui/theme'),
-    # 应用图标资源（运行时窗口/托盘图标）
-    ('src/assets/app_icon.ico', 'src/assets'),
-    ('src/assets/app_icon.svg', 'src/assets'),
+]
+
+# 应用图标资源（运行时窗口/托盘图标）:
+# exe 文件图标由 EXE(icon=...) 写入 PE 资源;运行时 Qt 托盘/窗口图标从
+# src/assets/app_icon_<size>.png 加载,这些资源与 app_icon.ico 同源生成。
+datas += [
+    (str(path), 'src/assets')
+    for path in sorted((base_path / 'src/assets').glob('app_icon*'))
+    if path.is_file()
 ]
 
 # 收集 RapidOCR 的配置文件

@@ -4,6 +4,7 @@
 Outputs:
 - src/assets/app_icon.svg  vector source / design reference
 - src/assets/app_icon.ico  Windows multi-size icon for PyInstaller
+- src/assets/app_icon_<size>.png  runtime Qt icon variants used by tray/window
 """
 from __future__ import annotations
 
@@ -270,10 +271,13 @@ def main() -> int:
     images = []
     for size in SIZES:
         rgba = _render_rgba(size, ss=4)
-        images.append((size, _png_bytes(size, rgba)))
+        png = _png_bytes(size, rgba)
+        (ASSETS / f"app_icon_{size}.png").write_bytes(png)
+        images.append((size, png))
     ICO_PATH.write_bytes(_ico_bytes(images))
     print(f"wrote {SVG_PATH.relative_to(ROOT)}")
     print(f"wrote {ICO_PATH.relative_to(ROOT)} ({ICO_PATH.stat().st_size} bytes)")
+    print(f"wrote {len(SIZES)} PNG runtime variants")
     return 0
 
 
