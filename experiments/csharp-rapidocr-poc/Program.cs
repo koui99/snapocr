@@ -55,8 +55,8 @@ sw.Stop();
 var lines = result.TextBlocks.Select((block, index) => new LineDto(
     Index: index,
     Text: block.Text,
-    AverageScore: block.CharScores is { Length: > 0 } ? block.CharScores.Average() : 0,
-    Box: block.BoxPoints.Select(p => new[] { p.X, p.Y }).ToArray()
+    AverageScore: block.CharScores is not null && block.CharScores.Any() ? block.CharScores.Average() : 0,
+    Box: block.BoxPoints.Select(p => new[] { (float)p.X, (float)p.Y }).ToArray()
 )).ToArray();
 
 var payload = new OcrDto(
