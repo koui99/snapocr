@@ -2,6 +2,11 @@ name: C# RapidOCR PoC
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/csharp-ocr-poc.yml'
+      - 'experiments/csharp-rapidocr-poc/**'
 
 jobs:
   csharp-ocr-poc:
