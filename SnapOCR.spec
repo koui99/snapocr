@@ -9,10 +9,15 @@ base_path = Path('.')
 
 # 手动指定所有数据文件
 datas = [
-    # OCR 模型（最重要）
-    ('src/core/ocr/models', 'src/core/ocr/models'),
+    # OCR 模型（最重要）:
+    # engine.py 在 PyInstaller 环境下从 sys._MEIPASS/models 查找模型,
+    # 因此这里必须收集到顶层 models/ 目录,避免打包后日语模型找不到而降级。
+    ('src/core/ocr/models', 'models'),
     # 主题文件
     ('src/ui/theme', 'src/ui/theme'),
+    # 应用图标资源（运行时窗口/托盘图标）
+    ('src/assets/app_icon.ico', 'src/assets'),
+    ('src/assets/app_icon.svg', 'src/assets'),
 ]
 
 # 收集 RapidOCR 的配置文件
@@ -76,6 +81,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,  # 改为 True 可以看到错误信息
+    icon='src/assets/app_icon.ico',
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

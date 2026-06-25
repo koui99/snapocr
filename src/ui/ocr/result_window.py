@@ -210,8 +210,13 @@ class OcrResultWindow(QWidget):
         type(self)._running_workers.add(worker)
         worker.sig_done.connect(self._on_done)
         worker.finished.connect(lambda w=worker: type(self)._running_workers.discard(w))
+        worker.finished.connect(self._clear_worker_ref)
         worker.finished.connect(worker.deleteLater)
         worker.start()
+
+    def _clear_worker_ref(self) -> None:
+        """识别线程结束后清空引用,避免后续访问已被 Qt deleteLater 的 QThread。"""
+        self._worker = None
 
     def _on_done(self, result: OcrResult) -> None:
         self._set_busy(False)

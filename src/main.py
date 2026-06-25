@@ -24,6 +24,7 @@ from src.app_context import AppContext  # noqa: E402
 from src.core.logger import get_logger, setup_logging  # noqa: E402
 from src.core.single_instance import SingleInstance  # noqa: E402
 from src.ui.theme import theme_manager  # noqa: E402
+from src.ui.tray.icon_factory import make_app_icon  # noqa: E402
 
 log = get_logger("main")
 
@@ -38,6 +39,7 @@ def main() -> int:
     app.setApplicationDisplayName("截图精灵")
     app.setQuitOnLastWindowClosed(False)  # 关闭窗口不退出,常驻托盘
     app.setFont(QFont("Microsoft YaHei", 9))
+    app.setWindowIcon(make_app_icon())
 
     theme_manager.apply_theme(app)
 
