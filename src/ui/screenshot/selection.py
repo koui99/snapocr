@@ -49,19 +49,20 @@ class SelectionTracker:
         """计算当前 8 个控制点中心的逻辑位置。"""
         if self.rect.isEmpty():
             return {}
-            
+
         r = self.rect
         c_x = r.x() + r.width() // 2
         c_y = r.y() + r.height() // 2
-        
+
+        # 使用明确的坐标计算，避免 topRight()/bottomRight() 的坐标偏差
         return {
-            HANDLE_TL: r.topLeft(),
+            HANDLE_TL: QPoint(r.left(), r.top()),
             HANDLE_T: QPoint(c_x, r.top()),
-            HANDLE_TR: r.topRight(),
+            HANDLE_TR: QPoint(r.right(), r.top()),
             HANDLE_R: QPoint(r.right(), c_y),
-            HANDLE_BR: r.bottomRight(),
+            HANDLE_BR: QPoint(r.right(), r.bottom()),
             HANDLE_B: QPoint(c_x, r.bottom()),
-            HANDLE_BL: r.bottomLeft(),
+            HANDLE_BL: QPoint(r.left(), r.bottom()),
             HANDLE_L: QPoint(r.left(), c_y),
         }
 
@@ -71,24 +72,32 @@ class SelectionTracker:
         返回:
             HANDLE_* 标识、'inside'、或 'outside'
         """
+        from src.core.logger import get_logger
+        log = get_logger("selection.hit_test")
+
         if self.is_empty():
             return "outside"
 
         # 1. 优先进行 8 控制点碰撞检测
         handles = self.get_handles()
+
+        # 输出所有控制点位置
+        log.debug(f"选区rect={self.rect}, 控制点数量={len(handles)}, 阈值={self.hit_threshold}")
+
         for name, pt in handles.items():
             # 距离检测
             dist = (pos - pt).manhattanLength()
+            log.debug(f"  控制点 {name}: pt={pt}, 鼠标pos={pos}, 距离={dist}")
             if dist <= self.hit_threshold:
-                from src.core.logger import get_logger
-                log = get_logger("selection.hit_test")
-                log.debug(f"命中控制点 {name}, 距离={dist}, 阈值={self.hit_threshold}, pos={pos}, handle={pt}")
+                log.info(f"✓ 命中控制点 {name}, 距离={dist}")
                 return name
 
         # 2. 检测是否在选区内
         if self.rect.contains(pos):
+            log.debug(f"在选区内 pos={pos}")
             return "inside"
 
+        log.debug(f"在选区外 pos={pos}")
         return "outside"
 
     def start_creation(self, start_pos: QPoint):
