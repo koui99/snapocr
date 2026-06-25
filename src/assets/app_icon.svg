@@ -1,0 +1,22 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="200" y1="150" x2="824" y2="874" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <filter id="shadow" x="64" y="72" width="896" height="896" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="24" stdDeviation="32" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <!-- 背景圆角矩形 -->
+  <rect x="112" y="112" width="800" height="800" rx="180" fill="url(#bg)" filter="url(#shadow)"/>
+  <!-- 截图选区框：虚线矩形 -->
+  <rect x="260" y="280" width="504" height="340" rx="20" stroke="white" stroke-width="48" stroke-dasharray="80 60" fill="none" opacity="0.9"/>
+  <!-- 四角控制点 -->
+  <circle cx="260" cy="280" r="32" fill="white"/>
+  <circle cx="764" cy="280" r="32" fill="white"/>
+  <circle cx="260" cy="620" r="32" fill="white"/>
+  <circle cx="764" cy="620" r="32" fill="white"/>
+  <!-- OCR 文字识别符号：底部显示 "OCR" -->
+  <text x="512" y="760" font-family="Arial, sans-serif" font-size="140" font-weight="bold" fill="white" text-anchor="middle" opacity="0.95">OCR</text>
+</svg>
