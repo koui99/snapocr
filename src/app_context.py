@@ -183,6 +183,9 @@ class AppContext(QObject):
             self._cleanup_screenshot_windows()
             return
 
+        # 先关闭截图窗口,避免全屏遮罩阻塞对话框
+        self._cleanup_screenshot_windows()
+
         if action == "copy":
             ScreenshotWriter.copy_to_clipboard(image)
             self.notify("截图已复制到剪贴板")
@@ -192,7 +195,8 @@ class AppContext(QObject):
                 self._remember_recent(path)
                 self.notify(f"截图已保存:{os.path.basename(path)}")
             else:
-                self.notify("截图保存失败,请检查保存目录")
+                # 用户取消或失败,都不提示(取消是正常操作)
+                pass
         elif action == "pin":
             # M3:把合成图原位、同尺寸钉到桌面(贴在选区原来的位置,体验同 Snipaste)
             self.pins.pin_image(image, at_topleft=origin, source_ratio=ratio)
@@ -203,8 +207,6 @@ class AppContext(QObject):
             log.info("已将截图原位钉图并原地识别")
         else:
             log.warning("未知截图动作:%s", action)
-
-        self._cleanup_screenshot_windows()
 
     def _remember_recent(self, path: str) -> None:
         recents = self.config.data.setdefault("recent_files", [])

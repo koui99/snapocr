@@ -218,6 +218,7 @@ class ScreenshotWindow(QWidget):
 
         # —— 选区模式 ——
         target = self.tracker.hit_test(pos)
+        log.debug(f"鼠标按下 pos={pos}, target={target}, state={self.tracker.state}")
         if self.tracker.state == SelectionState.IDLE or target == "outside":
             self.tracker.start_creation(pos)
         elif target == "inside":
@@ -366,12 +367,14 @@ class ScreenshotWindow(QWidget):
         self.toolbar.adjustSize()
         tw, th = self.toolbar.width(), self.toolbar.height()
         r = self.tracker.rect
-        x = r.right() - tw
-        y = r.bottom() + 6
+        # 工具栏居中对齐选区底部,而非右对齐,避免遮挡右下控制点
+        x = r.x() + (r.width() - tw) // 2
+        y = r.bottom() + 10  # 距离选区底部 10 像素
         if y + th > self.height():           # 下方放不下 → 选区上方
-            y = r.top() - th - 6
-        if y < 0:                            # 仍放不下 → 选区内底部
-            y = max(4, r.bottom() - th - 6)
+            y = r.top() - th - 10
+        if y < 0:                            # 仍放不下 → 选区内底部(远离控制点)
+            y = max(4, r.bottom() - th - 20)
+        # 确保不超出屏幕边界
         x = max(4, min(x, self.width() - tw - 4))
         self.toolbar.move(x, y)
         self.toolbar.show()

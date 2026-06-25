@@ -125,8 +125,7 @@ class ScreenshotWriter:
             None,  # parent
             "保存截图",  # caption
             default_path,  # default path
-            "PNG 图片 (*.png);;JPEG 图片 (*.jpg *.jpeg);;所有文件 (*.*)",  # filter
-            options=QFileDialog.Option.DontUseNativeDialog  # 使用 Qt 对话框,跨平台统一
+            "PNG 图片 (*.png);;JPEG 图片 (*.jpg *.jpeg);;所有文件 (*.*)"  # filter
         )
 
         # 用户取消
