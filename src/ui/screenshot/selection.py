@@ -72,32 +72,21 @@ class SelectionTracker:
         返回:
             HANDLE_* 标识、'inside'、或 'outside'
         """
-        from src.core.logger import get_logger
-        log = get_logger("selection.hit_test")
-
         if self.is_empty():
             return "outside"
 
         # 1. 优先进行 8 控制点碰撞检测
         handles = self.get_handles()
-
-        # 输出所有控制点位置
-        log.debug(f"选区rect={self.rect}, 控制点数量={len(handles)}, 阈值={self.hit_threshold}")
-
         for name, pt in handles.items():
             # 距离检测
             dist = (pos - pt).manhattanLength()
-            log.debug(f"  控制点 {name}: pt={pt}, 鼠标pos={pos}, 距离={dist}")
             if dist <= self.hit_threshold:
-                log.info(f"✓ 命中控制点 {name}, 距离={dist}")
                 return name
 
         # 2. 检测是否在选区内
         if self.rect.contains(pos):
-            log.debug(f"在选区内 pos={pos}")
             return "inside"
 
-        log.debug(f"在选区外 pos={pos}")
         return "outside"
 
     def start_creation(self, start_pos: QPoint):

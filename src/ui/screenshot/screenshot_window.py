@@ -218,9 +218,6 @@ class ScreenshotWindow(QWidget):
 
         # —— 选区模式 ——
         target = self.tracker.hit_test(pos)
-        log.debug(f"鼠标按下 pos={pos}, target={target}, state={self.tracker.state}")
-
-        # 修复逻辑：优先判断 target，而非 state
         if target == "outside":
             # 点击选区外 → 重新创建选区
             self.tracker.start_creation(pos)
@@ -263,7 +260,6 @@ class ScreenshotWindow(QWidget):
             self.show_magnifier = True
             target = self.tracker.hit_test(pos)
             cursor = self.tracker.get_cursor_shape(target)
-            log.debug(f"鼠标悬停 pos={pos}, target={target}, cursor={cursor}")
             self.setCursor(cursor)
             if not self.last_magnifier_dirty_rect.isEmpty():
                 self.update(self.last_magnifier_dirty_rect)
