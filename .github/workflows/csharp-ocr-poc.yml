@@ -95,7 +95,7 @@ jobs:
       - name: Size report
         shell: powershell
         run: |
-          $report = "experiments/csharp-rapidocr-poc/samples/size-report.txt"
+          $report = "experiments/csharp-rapidocr-poc/samples/csharp-ocr-poc-size-report.txt"
           foreach ($dir in @(
             "experiments/csharp-rapidocr-poc/publish/win-x64-fd",
             "experiments/csharp-rapidocr-poc/publish/win-x64-sc"
@@ -111,11 +111,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: csharp-rapidocr-poc-results
+          name: csharp-ocr-poc
           path: |
             experiments/csharp-rapidocr-poc/samples/*.png
             experiments/csharp-rapidocr-poc/samples/*.json
-            experiments/csharp-rapidocr-poc/samples/size-report.txt
+            experiments/csharp-rapidocr-poc/samples/csharp-ocr-poc-size-report.txt
             experiments/csharp-rapidocr-poc/publish/win-x64-fd/
             experiments/csharp-rapidocr-poc/publish/win-x64-sc/
           retention-days: 7
