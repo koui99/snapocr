@@ -1,0 +1,96 @@
+name: C# RapidOCR PoC
+
+on:
+  workflow_dispatch:
+
+jobs:
+  csharp-ocr-poc:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Generate sample images
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path experiments/csharp-rapidocr-poc/samples | Out-Null
+          Add-Type -AssemblyName System.Drawing
+
+          function New-SampleImage($path, $lines) {
+            $bmp = New-Object System.Drawing.Bitmap 1000, 320
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.Clear([System.Drawing.Color]::White)
+            $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
+            $font = New-Object System.Drawing.Font("Microsoft YaHei", 36, [System.Drawing.FontStyle]::Regular)
+            $brush = [System.Drawing.Brushes]::Black
+            $y = 42
+            foreach ($line in $lines) {
+              $g.DrawString($line, $font, $brush, 42, $y)
+              $y += 92
+            }
+            $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+            $g.Dispose(); $font.Dispose(); $bmp.Dispose()
+          }
+
+          New-SampleImage "experiments/csharp-rapidocr-poc/samples/latin.png" @("SnapOCR CSharp OCR Test", "Hello 12345")
+          New-SampleImage "experiments/csharp-rapidocr-poc/samples/chinese.png" @("截图识文 CSharp OCR 测试", "中文 English 12345")
+
+      - name: Restore and build
+        run: dotnet build experiments/csharp-rapidocr-poc/CSharpRapidOcrPoc.csproj -c Release
+
+      - name: Run latin bundled model smoke test
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          dotnet run --project experiments/csharp-rapidocr-poc/CSharpRapidOcrPoc.csproj -c Release -- `
+            experiments/csharp-rapidocr-poc/samples/latin.png `
+            --json experiments/csharp-rapidocr-poc/samples/latin.out.json `
+            --draw experiments/csharp-rapidocr-poc/samples/latin.boxed.png
+          Get-Content experiments/csharp-rapidocr-poc/samples/latin.out.json
+
+      - name: Download Chinese PP-OCRv5 models
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File experiments/csharp-rapidocr-poc/scripts/download-chinese-v5.ps1
+
+      - name: Run Chinese custom model test
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          dotnet run --project experiments/csharp-rapidocr-poc/CSharpRapidOcrPoc.csproj -c Release -- `
+            experiments/csharp-rapidocr-poc/samples/chinese.png `
+            --det experiments/csharp-rapidocr-poc/models/ch-v5/ch_PP-OCRv5_det_mobile.onnx `
+            --cls experiments/csharp-rapidocr-poc/models/ch-v5/ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx `
+            --rec experiments/csharp-rapidocr-poc/models/ch-v5/ch_PP-OCRv5_rec_mobile.onnx `
+            --keys experiments/csharp-rapidocr-poc/models/ch-v5/ppocrv5_dict.txt `
+            --json experiments/csharp-rapidocr-poc/samples/chinese.out.json `
+            --draw experiments/csharp-rapidocr-poc/samples/chinese.boxed.png
+          Get-Content experiments/csharp-rapidocr-poc/samples/chinese.out.json
+
+      - name: Publish framework-dependent win-x64
+        run: dotnet publish experiments/csharp-rapidocr-poc/CSharpRapidOcrPoc.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o experiments/csharp-rapidocr-poc/publish/win-x64-fd
+
+      - name: Size report
+        shell: powershell
+        run: |
+          $dir = "experiments/csharp-rapidocr-poc/publish/win-x64-fd"
+          $bytes = (Get-ChildItem $dir -Recurse -File | Measure-Object -Property Length -Sum).Sum
+          "publish/win-x64-fd bytes=$bytes mb=$([math]::Round($bytes/1MB, 2))" | Tee-Object -FilePath experiments/csharp-rapidocr-poc/samples/size-report.txt
+          Get-ChildItem $dir -Recurse -File | Sort-Object Length -Descending | Select-Object -First 30 FullName,Length
+
+      - name: Upload PoC results
+        uses: actions/upload-artifact@v4
+        with:
+          name: csharp-rapidocr-poc-results
+          path: |
+            experiments/csharp-rapidocr-poc/samples/*.png
+            experiments/csharp-rapidocr-poc/samples/*.json
+            experiments/csharp-rapidocr-poc/samples/size-report.txt
+            experiments/csharp-rapidocr-poc/publish/win-x64-fd/
+          retention-days: 7
