@@ -67,7 +67,7 @@ class SelectionTracker:
 
     def hit_test(self, pos: QPoint) -> str:
         """测试给定点所在的交互区域。
-        
+
         返回:
             HANDLE_* 标识、'inside'、或 'outside'
         """
@@ -78,13 +78,17 @@ class SelectionTracker:
         handles = self.get_handles()
         for name, pt in handles.items():
             # 距离检测
-            if (pos - pt).manhattanLength() <= self.hit_threshold:
+            dist = (pos - pt).manhattanLength()
+            if dist <= self.hit_threshold:
+                from src.core.logger import get_logger
+                log = get_logger("selection.hit_test")
+                log.debug(f"命中控制点 {name}, 距离={dist}, 阈值={self.hit_threshold}, pos={pos}, handle={pt}")
                 return name
 
         # 2. 检测是否在选区内
         if self.rect.contains(pos):
             return "inside"
-            
+
         return "outside"
 
     def start_creation(self, start_pos: QPoint):

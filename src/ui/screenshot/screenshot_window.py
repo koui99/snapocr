@@ -255,7 +255,10 @@ class ScreenshotWindow(QWidget):
             self.update()
         else:
             self.show_magnifier = True
-            self.setCursor(self.tracker.get_cursor_shape(self.tracker.hit_test(pos)))
+            target = self.tracker.hit_test(pos)
+            cursor = self.tracker.get_cursor_shape(target)
+            log.debug(f"鼠标悬停 pos={pos}, target={target}, cursor={cursor}")
+            self.setCursor(cursor)
             if not self.last_magnifier_dirty_rect.isEmpty():
                 self.update(self.last_magnifier_dirty_rect)
             self.update(QRect(pos.x() - 160, pos.y() - 160, 320, 320))
