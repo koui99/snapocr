@@ -2,12 +2,17 @@ name: 构建 Windows EXE
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, 'optimize/**' ]
   workflow_dispatch:  # 允许手动触发
+
+permissions:
+  contents: write   # 失败诊断步骤需要推送 ci-diag 分支
 
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"   # Windows 管道输出默认 cp1252,统一 UTF-8 防中文输出报错
 
     steps:
     - name: 检出代码
@@ -29,6 +34,66 @@ jobs:
         python tools/generate_app_icon.py
         pyinstaller SnapOCR.spec
         echo . > dist/SnapOCR/portable.flag
+
+    - name: 生成 OCR 冒烟样图(原生平台,字体完整)
+      run: |
+        python tools/generate_smoke_sample.py dist/SnapOCR/smoke_sample.png
+
+    - name: 冒烟测试(offscreen + windows 两种平台启动打包后的 exe)
+      timeout-minutes: 8
+      run: |
+        foreach ($platform in @("offscreen", "windows")) {
+          Write-Host "=== QT_QPA_PLATFORM=$platform ==="
+          $env:QT_QPA_PLATFORM = $platform
+          Remove-Item dist\SnapOCR\smoke_result.json -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath "dist\SnapOCR\SnapOCR.exe" -ArgumentList "--smoke-test" -Wait -PassThru
+          Write-Host "退出码: $($p.ExitCode)"
+          if (Test-Path dist\SnapOCR\smoke_result.json) {
+            Get-Content dist\SnapOCR\smoke_result.json -Encoding UTF8
+          } else {
+            Write-Host "::warning::未生成 smoke_result.json"
+          }
+          if ($p.ExitCode -ne 0) {
+            Write-Host "::error::冒烟测试未通过(platform=$platform)"
+            exit 1
+          }
+        }
+
+    - name: 失败诊断(推送诊断信息到 ci-diag 分支)
+      if: failure()
+      run: |
+        New-Item -ItemType Directory -Force diag | Out-Null
+        if (Test-Path dist\SnapOCR\smoke_result.json) { Copy-Item dist\SnapOCR\smoke_result.json diag\ }
+        if (Test-Path dist\SnapOCR\smoke_sample.png) { Copy-Item dist\SnapOCR\smoke_sample.png diag\ }
+        if (Test-Path build\SnapOCR\warn-SnapOCR.txt) { Copy-Item build\SnapOCR\warn-SnapOCR.txt diag\ }
+        if (Test-Path dist\SnapOCR\data\logs) {
+          Get-ChildItem dist\SnapOCR\data\logs -File | ForEach-Object { Copy-Item $_.FullName ("diag\applog_" + $_.Name) }
+        }
+        if (Test-Path dist\SnapOCR) {
+          $root = (Resolve-Path dist\SnapOCR).Path
+          Get-ChildItem dist\SnapOCR -Recurse -File | ForEach-Object {
+            "{0}`t{1}" -f $_.Length, $_.FullName.Substring($root.Length + 1)
+          } | Out-File diag\filelist.txt -Encoding UTF8
+        }
+        git config user.name "ci-diag"
+        git config user.email "ci@localhost"
+        git add -f diag
+        git commit -m "ci diag run=$env:GITHUB_RUN_ID"
+        git push -f origin HEAD:ci-diag
+
+    - name: 体积报告
+      run: |
+        # 清理冒烟测试产生的临时文件,不进正式产物
+        Remove-Item dist\SnapOCR\smoke_result.json, dist\SnapOCR\smoke_sample.png -ErrorAction SilentlyContinue
+        Remove-Item dist\SnapOCR\data -Recurse -Force -ErrorAction SilentlyContinue
+        $bytes = (Get-ChildItem dist\SnapOCR -Recurse -File | Measure-Object Length -Sum).Sum
+        $unpacked = [math]::Round($bytes / 1MB, 1)
+        Compress-Archive -Path dist\SnapOCR\* -DestinationPath SnapOCR-size-probe.zip
+        $zipped = [math]::Round((Get-Item SnapOCR-size-probe.zip).Length / 1MB, 1)
+        Remove-Item SnapOCR-size-probe.zip
+        Write-Host "解压体积: $unpacked MB / 压缩后: $zipped MB"
+        "### 📦 体积报告`n- 解压: **$unpacked MB**`n- zip: **$zipped MB**`n(基线 2026-06-25: 解压 321.2 MB / zip 141.1 MB)" | Out-File $env:GITHUB_STEP_SUMMARY -Encoding UTF8
+        Get-ChildItem dist\SnapOCR\_internal -Recurse -File | Sort-Object Length -Descending | Select-Object -First 15 @{n='MB';e={[math]::Round($_.Length/1MB,1)}}, FullName | Format-Table -AutoSize
 
     - name: 上传构建产物
       uses: actions/upload-artifact@v4
