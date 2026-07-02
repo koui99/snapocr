@@ -2,7 +2,9 @@
 # 建议 Python 3.11–3.13:PySide6 对 Python 3.14 可能尚无官方 wheel。
 # Windows 验证时若 3.14 安装失败,请改用 3.12:  py -3.12 -m venv .venv
 
-PySide6>=6.6,<6.9
+# Essentials 只含 Qt 基础模块(本项目仅用 QtCore/QtGui/QtWidgets/QtNetwork/QtSvg),
+# 不装 Addons(QtMultimedia/Qt3D/QtCharts 等),安装与打包都更小。
+PySide6-Essentials>=6.6,<6.9
 mss>=9.0            # M2 跨平台截屏取帧(缺失时自动降级 QScreen/Mock)
 rapidocr-onnxruntime>=1.3,<2.0   # M4 本地离线 OCR(ONNX,缺失时识别给中文提示不崩)
 

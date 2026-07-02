@@ -2,7 +2,7 @@ name: 构建 Windows EXE
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, 'optimize/**' ]
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -29,6 +29,36 @@ jobs:
         python tools/generate_app_icon.py
         pyinstaller SnapOCR.spec
         echo . > dist/SnapOCR/portable.flag
+
+    - name: 冒烟测试(offscreen + windows 两种平台启动打包后的 exe)
+      run: |
+        foreach ($platform in @("offscreen", "windows")) {
+          Write-Host "=== QT_QPA_PLATFORM=$platform ==="
+          $env:QT_QPA_PLATFORM = $platform
+          Remove-Item dist\SnapOCR\smoke_result.json -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath "dist\SnapOCR\SnapOCR.exe" -ArgumentList "--smoke-test" -Wait -PassThru
+          Write-Host "退出码: $($p.ExitCode)"
+          if (Test-Path dist\SnapOCR\smoke_result.json) {
+            Get-Content dist\SnapOCR\smoke_result.json -Encoding UTF8
+          } else {
+            Write-Host "::warning::未生成 smoke_result.json"
+          }
+          if ($p.ExitCode -ne 0) {
+            Write-Host "::error::冒烟测试未通过(platform=$platform)"
+            exit 1
+          }
+        }
+
+    - name: 体积报告
+      run: |
+        $bytes = (Get-ChildItem dist\SnapOCR -Recurse -File | Measure-Object Length -Sum).Sum
+        $unpacked = [math]::Round($bytes / 1MB, 1)
+        Compress-Archive -Path dist\SnapOCR\* -DestinationPath SnapOCR-size-probe.zip
+        $zipped = [math]::Round((Get-Item SnapOCR-size-probe.zip).Length / 1MB, 1)
+        Remove-Item SnapOCR-size-probe.zip
+        Write-Host "解压体积: $unpacked MB / 压缩后: $zipped MB"
+        "### 📦 体积报告`n- 解压: **$unpacked MB**`n- zip: **$zipped MB**`n(基线 2026-06-25: 解压 321.2 MB / zip 141.1 MB)" | Out-File $env:GITHUB_STEP_SUMMARY -Encoding UTF8
+        Get-ChildItem dist\SnapOCR\_internal -Recurse -File | Sort-Object Length -Descending | Select-Object -First 15 @{n='MB';e={[math]::Round($_.Length/1MB,1)}}, FullName | Format-Table -AutoSize
 
     - name: 上传构建产物
       uses: actions/upload-artifact@v4

@@ -31,6 +31,11 @@ log = get_logger("main")
 
 def main() -> int:
     setup_logging()
+    if "--smoke-test" in sys.argv:
+        # CI 打包冒烟测试:验证 Qt/SVG/QLocalServer/OCR 链路后直接退出
+        from src.core.smoke_test import run_smoke_test
+
+        return run_smoke_test()
     minimized = "--minimized" in sys.argv  # 开机自启时静默到托盘(预留)
     log.info("SnapOCR 启动(minimized=%s)", minimized)
 
