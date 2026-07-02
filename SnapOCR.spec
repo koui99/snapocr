@@ -193,7 +193,8 @@ def _keep(entry) -> bool:
 _before = len(a.binaries) + len(a.datas)
 a.binaries = [e for e in a.binaries if _keep(e)]
 a.datas = [e for e in a.datas if _keep(e)]
-print(f'[SnapOCR.spec] 瘦身过滤:剔除 {_before - len(a.binaries) - len(a.datas)} 个文件')
+# CI 的 stdout 可能是 cp1252 编码,这里只打印 ASCII,避免 UnicodeEncodeError
+print(f'[SnapOCR.spec] slim filter removed {_before - len(a.binaries) - len(a.datas)} files')
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

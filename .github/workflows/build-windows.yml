@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"   # Windows 管道输出默认 cp1252,统一 UTF-8 防中文输出报错
 
     steps:
     - name: 检出代码
