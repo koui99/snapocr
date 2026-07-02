@@ -35,6 +35,10 @@ jobs:
         pyinstaller SnapOCR.spec
         echo . > dist/SnapOCR/portable.flag
 
+    - name: 生成 OCR 冒烟样图(原生平台,字体完整)
+      run: |
+        python tools/generate_smoke_sample.py dist/SnapOCR/smoke_sample.png
+
     - name: 冒烟测试(offscreen + windows 两种平台启动打包后的 exe)
       timeout-minutes: 8
       run: |
@@ -60,6 +64,7 @@ jobs:
       run: |
         New-Item -ItemType Directory -Force diag | Out-Null
         if (Test-Path dist\SnapOCR\smoke_result.json) { Copy-Item dist\SnapOCR\smoke_result.json diag\ }
+        if (Test-Path dist\SnapOCR\smoke_sample.png) { Copy-Item dist\SnapOCR\smoke_sample.png diag\ }
         if (Test-Path build\SnapOCR\warn-SnapOCR.txt) { Copy-Item build\SnapOCR\warn-SnapOCR.txt diag\ }
         if (Test-Path dist\SnapOCR\data\logs) {
           Get-ChildItem dist\SnapOCR\data\logs -File | ForEach-Object { Copy-Item $_.FullName ("diag\applog_" + $_.Name) }
@@ -78,6 +83,9 @@ jobs:
 
     - name: 体积报告
       run: |
+        # 清理冒烟测试产生的临时文件,不进正式产物
+        Remove-Item dist\SnapOCR\smoke_result.json, dist\SnapOCR\smoke_sample.png -ErrorAction SilentlyContinue
+        Remove-Item dist\SnapOCR\data -Recurse -Force -ErrorAction SilentlyContinue
         $bytes = (Get-ChildItem dist\SnapOCR -Recurse -File | Measure-Object Length -Sum).Sum
         $unpacked = [math]::Round($bytes / 1MB, 1)
         Compress-Archive -Path dist\SnapOCR\* -DestinationPath SnapOCR-size-probe.zip

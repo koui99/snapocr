@@ -35,7 +35,17 @@ def _result_path() -> str:
 
 
 def _paint_sample() -> bytes:
-    """用 QPainter 画一张白底黑字测试图,返回 PNG 字节。"""
+    """获取 OCR 测试图 PNG 字节。
+
+    优先读 exe 同目录的 smoke_sample.png(CI 在原生平台预生成,字体可靠);
+    没有则现场用 QPainter 画(本地开发场景;offscreen 下可能无字体画出白图)。
+    """
+    if getattr(sys, "frozen", False):
+        pre = os.path.join(os.path.dirname(sys.executable), "smoke_sample.png")
+        if os.path.exists(pre):
+            with open(pre, "rb") as f:
+                return f.read()
+
     from PySide6.QtCore import QBuffer, Qt
     from PySide6.QtGui import QColor, QFont, QImage, QPainter
 
