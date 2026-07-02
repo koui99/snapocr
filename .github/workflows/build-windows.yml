@@ -5,6 +5,9 @@ on:
     branches: [ master, 'optimize/**' ]
   workflow_dispatch:  # 允许手动触发
 
+permissions:
+  contents: write   # 失败诊断步骤需要推送 ci-diag 分支
+
 jobs:
   build:
     runs-on: windows-latest
