@@ -33,6 +33,7 @@ jobs:
         echo . > dist/SnapOCR/portable.flag
 
     - name: 冒烟测试(offscreen + windows 两种平台启动打包后的 exe)
+      timeout-minutes: 8
       run: |
         foreach ($platform in @("offscreen", "windows")) {
           Write-Host "=== QT_QPA_PLATFORM=$platform ==="
@@ -50,6 +51,27 @@ jobs:
             exit 1
           }
         }
+
+    - name: 失败诊断(推送诊断信息到 ci-diag 分支)
+      if: failure()
+      run: |
+        New-Item -ItemType Directory -Force diag | Out-Null
+        if (Test-Path dist\SnapOCR\smoke_result.json) { Copy-Item dist\SnapOCR\smoke_result.json diag\ }
+        if (Test-Path build\SnapOCR\warn-SnapOCR.txt) { Copy-Item build\SnapOCR\warn-SnapOCR.txt diag\ }
+        if (Test-Path dist\SnapOCR\data\logs) {
+          Get-ChildItem dist\SnapOCR\data\logs -File | ForEach-Object { Copy-Item $_.FullName ("diag\applog_" + $_.Name) }
+        }
+        if (Test-Path dist\SnapOCR) {
+          $root = (Resolve-Path dist\SnapOCR).Path
+          Get-ChildItem dist\SnapOCR -Recurse -File | ForEach-Object {
+            "{0}`t{1}" -f $_.Length, $_.FullName.Substring($root.Length + 1)
+          } | Out-File diag\filelist.txt -Encoding UTF8
+        }
+        git config user.name "ci-diag"
+        git config user.email "ci@localhost"
+        git add -f diag
+        git commit -m "ci diag run=$env:GITHUB_RUN_ID"
+        git push -f origin HEAD:ci-diag
 
     - name: 体积报告
       run: |
