@@ -167,7 +167,7 @@ python run.py
 ## 📋 常见问题
 
 **Q: 为什么 exe 文件这么大（100+ MB）？**  
-A: 包含了完整的 Python 运行时 + PySide6 GUI 库 + ONNX Runtime + OCR 模型，保证离线可用。
+A: 包含了完整的 Python 运行时 + PySide6 GUI 库 + ONNX Runtime + OCR 模型，保证离线可用。打包配置已做过瘦身（剔除未用的 Qt 模块、视频编解码器、非中文翻译等，压缩包约减少 30%），剩余体积主要来自 OpenCV 与 ONNX 推理引擎，是本地离线 OCR 的必要成本。
 
 **Q: 杀毒软件报毒？**  
 A: PyInstaller 打包的 exe 可能被误报，属于正常现象。可查看源码自行打包，或添加信任白名单。
